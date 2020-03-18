@@ -13,7 +13,7 @@ f1 = 7
 f2 = 30
 order = 8
 fb, fa = butter(order, [2*f1/fs, 2*f2/fs], btype='band')
-# show_filter(fb, fa, fs)
+show_filter(fb, fa, fs)
 
 sampleseg = [50, 350]
 chanset = np.arange(118)

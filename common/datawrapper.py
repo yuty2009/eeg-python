@@ -24,16 +24,21 @@ def read_cntdata(filepath):
 
 
 class Dataset(object):
-    def __init__(self, inputs):
-        self._data = inputs
-        self._num_examples = self._data.shape[0]
+    def __init__(self, features, labels):
+        self._features = features
+        self._labels = labels
+        self._num_examples = self._features.shape[0]
         self._indices = np.arange(self._num_examples)
         self._epochs_completed = 0
         self._index_in_epoch = 0
 
     @property
-    def data(self):
-        return self._data
+    def features(self):
+        return self._features
+
+    @property
+    def labels(self):
+        return self._labels
 
     @property
     def num_examples(self):
@@ -49,7 +54,7 @@ class Dataset(object):
         self._indices = perm
 
     def get_portiondata(self, indices):
-        return self._data[indices]
+        return self._features[indices], self._labels[indices]
 
     def get_subset(self, ratio, shuffle=True):
         ratio = ratio / np.sum(ratio)
@@ -61,7 +66,12 @@ class Dataset(object):
         starts[1:]  = starts[0:-1]
         starts[0] = 0
         if shuffle: self.shuffle()
-        return [Dataset(self.get_portiondata(self._indices[start:end])) for (start, end) in (starts, ends)]
+        subsets = []
+        for (start, end) in (starts, ends):
+            subfeatures, sublabels = self.get_portiondata(self._indices[start:end])
+            subset = Dataset(subfeatures, sublabels)
+            subsets.append(subset)
+        return subsets
 
     def next_batch(self, batch_size, shuffle=True):
         '''Return the next `batch_size` examples from this data set.'''

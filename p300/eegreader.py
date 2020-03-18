@@ -33,7 +33,7 @@ def extract_eegdata(signal, flashing, stimuluscode, targetchar, filter):
     num_channels = signal.shape[2]
 
     fb, fa = filter
-    # show_filtering_result(fb, fa, signal[0,:,0])
+    show_filtering_result(fb, fa, signal[0,:,0])
 
     signal_filtered = np.zeros(signal.shape)
     for i in range(num_trials):
@@ -46,7 +46,7 @@ def extract_eegdata(signal, flashing, stimuluscode, targetchar, filter):
     for i in range(num_trials):
         repeat = np.zeros([num_chars,1], dtype=int)
         for n in range(1, signal.shape[1]):
-            if flashing[i, n-1] == 1 and flashing[i, n] == 0:
+            if flashing[i, n-1] == 1 and flashing[i, n] == 0: # Falling edge
                 event = int(stimuluscode[i, n-1])
                 data[i, event-1, repeat[event-1], :, :] = signal_filtered[i, n:n+num_samples, :]
                 repeat[event - 1] += 1
@@ -65,7 +65,7 @@ def extract_feature(data, target, sampleseg, chanset, dfs):
 
     np.seterr(divide='ignore', invalid='ignore')
     labels = np.zeros([num_trials, num_chars, num_repeats])
-    feature = np.zeros([num_trials, num_chars, num_repeats, num_features])
+    feature = np.zeros([num_trials, num_chars, num_repeats, num_samples_used, num_channel_used])
     for trial in range(num_trials):
         target_index = matrix.find(target[trial])
         target_row = int(np.floor((target_index)/6))
@@ -84,13 +84,18 @@ def extract_feature(data, target, sampleseg, chanset, dfs):
                         signal_normalized[:, c] = np.zeros(num_channel_used)
                     else:
                         signal_normalized[:, c] = zscore(signal_downsampled[:, c])
-                feature[trial, char, repeat, :] = np.reshape(signal_normalized, [-1])
+                feature[trial, char, repeat, :, :] = signal_normalized
     return feature, labels
 
 
 def load_dataset(datapath, subject):
     f = np.load(datapath+'processed/'+subject+'.npz')
     return f['featureTrain'], f['labelTrain'], f['targetTrain'], f['featureTest'], f['labelTest'], f['targetTest']
+
+
+def load_standardized_dataset(features, labels):
+    dataset = Dataset(features, labels)
+    return dataset
 
 
 if __name__ == '__main__':
@@ -107,13 +112,13 @@ if __name__ == '__main__':
     f2 = 20
     order = 6
     fb, fa = butter(order, 2 * f2 / fs, btype='low')
-    # show_filter(fb, fa, fs)
+    show_filter(fb, fa, fs)
 
-    dfs = 6
-    sampleseg = [0, int(0.6 * fs)]
+    dfs = 2
+    sampleseg = [0, int(0.65 * fs)]
     chanset = np.arange(64)
 
-    subject = 'Subject_B'
+    subject = 'Subject_A'
     file_train = datapath + subject + '_Train.mat'
     file_test = datapath + subject + '_Test.mat'
     file_label = datapath + 'true_labels_' + subject[-1].lower() + '.txt'

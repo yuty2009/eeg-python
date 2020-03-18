@@ -11,15 +11,15 @@ datapath = 'E:/bcicompetition/bci2005/II/'
 
 subject = 'Subject_B'
 featureTrain, labelTrain, targetTrain, featureTest, labelTest, targetTest = load_dataset(datapath, subject)
-num_train, num_chars, num_repeats, num_samples, num_channels = featureTrain.shape
+num_train, num_chars, num_repeats, num_features = featureTrain.shape
 num_test = featureTest.shape[0]
 
-X_train = np.reshape(featureTrain, [-1, num_samples*num_channels])
+X_train = np.reshape(featureTrain, [-1, num_features])
 y_train = np.reshape(labelTrain, [-1])
 
 w, b = ridgereg(y_train, X_train)
 
-X_test = np.reshape(featureTest, [-1, num_samples*num_channels])
+X_test = np.reshape(featureTest, [-1, num_features])
 y_predict = np.dot(X_test, w) + b
 
 targetPredict = np.zeros([num_test, num_repeats], dtype=np.str)
