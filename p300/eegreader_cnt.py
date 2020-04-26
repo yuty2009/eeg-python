@@ -27,7 +27,7 @@ def extract_eegdata(eegdata, events, filter):
     num_repeats = int((cuepos[1] - cuepos[0]) / num_chars)
 
     target = np.zeros(num_trials, dtype=int)
-    data = np.zeros([num_trials, num_chars, num_repeats, num_samples, num_channels])
+    data = np.zeros([num_trials, num_repeats, num_chars, num_samples, num_channels])
     for i in range(num_trials):
         target[i] = eventtype[cuepos[i]] - num_chars
         repeat = np.zeros(num_chars, dtype=int)
@@ -38,13 +38,13 @@ def extract_eegdata(eegdata, events, filter):
                 if event > 0 and event <= num_chars:
                     repeat[event - 1] += 1
                     signal_epoch = eegdata[:, eventpos[kk]:eventpos[kk]+num_samples]
-                    data[i, event-1, repeat[event-1]-1, :, :] = signal_epoch.T
+                    data[i, repeat[event-1]-1, event-1, :, :] = signal_epoch.T
 
     return data, target
 
 
 def extract_feature(data, target, sampleseg, chanset, dfs):
-    num_trials, num_chars, num_repeats, num_samples, num_channels = data.shape
+    num_trials, num_repeats, num_chars, num_samples, num_channels = data.shape
 
     sample_begin = sampleseg[0]
     sample_end = sampleseg[1]
@@ -53,14 +53,14 @@ def extract_feature(data, target, sampleseg, chanset, dfs):
     num_features = num_samples_used * num_channel_used
 
     np.seterr(divide='ignore', invalid='ignore')
-    labels = np.zeros([num_trials, num_chars, num_repeats])
-    feature = np.zeros([num_trials, num_chars, num_repeats, num_features])
+    labels = np.zeros([num_trials, num_repeats, num_chars])
+    feature = np.zeros([num_trials, num_repeats, num_chars, num_features])
     for trial in range(num_trials):
-        labels[trial, target[trial]-1, :] = 1
+        labels[trial, :, target[trial]-1] = 1
         signal_trial = data[trial]
-        for char in range(num_chars):
-            for repeat in range(num_repeats):
-                signal_epoch = signal_trial[char, repeat, :, :]
+        for repeat in range(num_repeats):
+            for char in range(num_chars):
+                signal_epoch = signal_trial[repeat, char, :, :]
                 signal_filtered = signal_epoch[sample_begin:sample_end, chanset]
                 signal_downsampled = np.transpose(decimate(signal_filtered.T, dfs, zero_phase=True))
                 signal_normalized = np.zeros(signal_downsampled.shape)
@@ -69,7 +69,7 @@ def extract_feature(data, target, sampleseg, chanset, dfs):
                         signal_normalized[:, c] = np.zeros(num_samples_used)
                     else:
                         signal_normalized[:, c] = zscore(signal_downsampled[:, c])
-                feature[trial, char, repeat, :] = np.reshape(signal_normalized, [-1])
+                feature[trial, repeat, char, :] = np.reshape(signal_normalized, [-1])
     return feature, labels
 
 
@@ -80,7 +80,7 @@ def load_dataset(datapath, subject):
 
 if __name__ == '__main__':
 
-    datapath = 'E:/eegdata/p300speller/'
+    datapath = 'E:/eegdata/scutbci/p300speller/'
 
     import os
     if not os.path.isdir(datapath + 'processed/'):
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     sampleseg = [0, int(0.6 * fs)]
     chanset = np.arange(30)
 
-    subject = 'p300speller_yutianyou_20161116_1'
+    subject = 'p300speller_yutianyou_20170313_1'
     file_train = datapath + subject + '.cnt'
 
     print('Load and extract continuous EEG into epochs for train data')

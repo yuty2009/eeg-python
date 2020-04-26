@@ -42,20 +42,20 @@ def extract_eegdata(signal, flashing, stimuluscode, targetchar, filter):
             signal_filtered[i,:,j] = filtfilt(fb, fa, signal_channel)
 
     target = np.array(list(targetchar))
-    data = np.zeros([num_trials, num_chars, num_repeats, num_samples, num_channels])
+    data = np.zeros([num_trials, num_repeats, num_chars, num_samples, num_channels])
     for i in range(num_trials):
         repeat = np.zeros([num_chars,1], dtype=int)
         for n in range(1, signal.shape[1]):
             if flashing[i, n-1] == 1 and flashing[i, n] == 0: # Falling edge
                 event = int(stimuluscode[i, n-1])
-                data[i, event-1, repeat[event-1], :, :] = signal_filtered[i, n:n+num_samples, :]
+                data[i, repeat[event-1], event-1, :, :] = signal_filtered[i, n-24:n-24+num_samples, :]
                 repeat[event - 1] += 1
 
     return data, target
 
 
 def extract_feature(data, target, sampleseg, chanset, dfs):
-    num_trials, num_chars, num_repeats, num_samples, num_channels = data.shape
+    num_trials, num_repeats, num_chars, num_samples, num_channels = data.shape
 
     sample_begin = sampleseg[0]
     sample_end = sampleseg[1]
@@ -64,18 +64,18 @@ def extract_feature(data, target, sampleseg, chanset, dfs):
     num_features = num_samples_used * num_channel_used
 
     np.seterr(divide='ignore', invalid='ignore')
-    labels = np.zeros([num_trials, num_chars, num_repeats])
-    feature = np.zeros([num_trials, num_chars, num_repeats, num_samples_used, num_channel_used])
+    labels = np.zeros([num_trials, num_repeats, num_chars])
+    feature = np.zeros([num_trials, num_repeats, num_chars, num_samples_used, num_channel_used])
     for trial in range(num_trials):
         target_index = matrix.find(target[trial])
         target_row = int(np.floor((target_index)/6))
         target_col = target_index - target_row * 6
-        labels[trial, (target_col, target_row + 6), :] = 1
+        labels[trial, :, (target_col, target_row + 6)] = 1
 
         signal_trial = data[trial]
-        for char in range(num_chars):
-            for repeat in range(num_repeats):
-                signal_epoch = signal_trial[char, repeat, :, :]
+        for repeat in range(num_repeats):
+            for char in range(num_chars):
+                signal_epoch = signal_trial[repeat, char, :, :]
                 signal_filtered = signal_epoch[sample_begin:sample_end, chanset]
                 signal_downsampled = np.transpose(decimate(signal_filtered.T, dfs, zero_phase=True))
                 signal_normalized = np.zeros(signal_downsampled.shape)
@@ -84,7 +84,7 @@ def extract_feature(data, target, sampleseg, chanset, dfs):
                         signal_normalized[:, c] = np.zeros(num_channel_used)
                     else:
                         signal_normalized[:, c] = zscore(signal_downsampled[:, c])
-                feature[trial, char, repeat, :, :] = signal_normalized
+                feature[trial, repeat, char, :, :] = signal_normalized
     return feature, labels
 
 

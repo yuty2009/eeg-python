@@ -4,7 +4,7 @@ import numpy as np
 from eegreader_cnt import *
 from common.regressor import *
 
-datapath = 'E:/eegdata/p300speller/'
+datapath = 'E:/eegdata/scutbci/p300speller/'
 
 fs = 250
 f2 = 20
@@ -23,7 +23,7 @@ print('Load and extract continuous EEG into epochs for train data')
 data, target = load_eegdata(file_train, [fb, fa])
 print('Extract P300 features from epochs for train data')
 feature, label = extract_feature(data, target, sampleseg, chanset, dfs)
-num_trials, num_chars, num_repeats, num_features = feature.shape
+num_trials, num_repeats, num_chars, num_features = feature.shape
 
 num_perms = 1
 num_folds = 10
@@ -56,10 +56,10 @@ for perm in range(num_perms):
 
         targetPredict = np.zeros([num_test, num_repeats])
         for trial in range(num_test):
-            ytrial = y_predict[trial*num_chars*num_repeats:(trial+1)*num_chars*num_repeats]
-            ytrial = np.reshape(ytrial, [num_chars, num_repeats])
+            ytrial = y_predict[trial*num_repeats*num_chars:(trial+1)*num_repeats*num_chars]
+            ytrial = np.reshape(ytrial, [num_repeats, num_chars])
             for repeat in range(num_repeats):
-                yavg = np.mean(ytrial[:,0:repeat+1], axis=1)
+                yavg = np.mean(ytrial[0:repeat+1,:], axis=0)
                 targetPredict[trial, repeat] = np.argmax(yavg) + 1
 
         for i in range(num_repeats):

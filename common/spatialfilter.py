@@ -26,7 +26,7 @@ def CSP1(R1, R2):
 
 
 def CSP2(R1, R2):
-    V, U = sp.linalg.eig(R1-R2, R1+R2)
+    V, U = sp.linalg.eig(R1, R2)
     ind = np.argsort(V)
     W = U[:, ind]
     return W
