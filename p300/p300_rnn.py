@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
 import numpy as np
-from eegreader import *
+from p300.eegreader import *
 from common.regressor import *
 
 # 6 by 6  matrix

@@ -1,8 +1,8 @@
 # -*- coding:utf-8 -*-
 
 import numpy as np
-from eegreader import *
-from common.classifier import *
+from common.linear import *
+from motorimagery.eegreader import *
 
 
 datapath = 'E:/bcicompetition/bci2005/IVa/'
@@ -11,8 +11,8 @@ subjects = ['aa', 'al', 'av', 'aw', 'ay']
 fs = 100
 f1 = 7
 f2 = 30
-order = 8
-fb, fa = butter(order, [2*f1/fs, 2*f2/fs], btype='band')
+order = 6
+fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='band')
 show_filter(fb, fa, fs)
 
 sampleseg = [50, 350]
@@ -40,7 +40,8 @@ for ss in range(len(subjects)):
     y_train = labelTrain
     y_train[np.argwhere(y_train == 2)] = -1
 
-    w, b = logistic(y_train, X_train)
+    model = LogisticRegression()
+    w, b = model.fit(X_train, y_train)
 
     X_test = np.zeros([num_test, num_features])
     for i in range(num_test):
@@ -50,7 +51,7 @@ for ss in range(len(subjects)):
     y_test = labelTest
     y_test[np.argwhere(y_test == 2)] = -1
 
-    y_predict = np.dot(X_test, w) + b
+    y_predict = model.predict(X_test)
 
     accTest[ss] = np.mean(np.array(np.sign(y_predict) == y_test).astype(int))
 

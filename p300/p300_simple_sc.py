@@ -2,7 +2,7 @@
 
 import numpy as np
 from eegreader_cnt import *
-from common.regressor import *
+from common.linear import *
 
 datapath = 'E:/eegdata/scutbci/p300speller/'
 
@@ -28,7 +28,7 @@ num_trials, num_repeats, num_chars, num_features = feature.shape
 num_perms = 1
 num_folds = 10
 num_total = num_trials
-num_test = int(np.floor(num_total/num_folds))
+num_test = num_total // num_folds
 num_train = num_total - num_test
 acc_train = np.zeros([num_perms, num_folds, num_repeats])
 print('%d - %d fold cross-validation' % (num_perms, num_folds))
@@ -49,10 +49,11 @@ for perm in range(num_perms):
         X_train = np.reshape(feature_train, [-1, num_features])
         y_train = np.reshape(label_train, [-1])
 
-        w, b = ridgereg(y_train, X_train)
+        model = RidgeRegression()
+        w, b = model.fit(X_train, y_train)
 
         X_test = np.reshape(feature_test, [-1, num_features])
-        y_predict = np.dot(X_test, w) + b
+        y_predict = model.predict(X_test)
 
         targetPredict = np.zeros([num_test, num_repeats])
         for trial in range(num_test):

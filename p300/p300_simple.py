@@ -2,7 +2,7 @@
 
 import numpy as np
 import eegreader as ds
-from common.regressor import *
+from common.linear import *
 
 # 6 by 6  matrixA
 matrix='ABCDEF'+'GHIJKL'+'MNOPQR'+'STUVWX'+'YZ1234'+'56789_'
@@ -18,10 +18,12 @@ X_train = np.reshape(featureTrain, [-1, num_samples*num_channels])
 y_train = np.reshape(labelTrain, [-1])
 
 X_test = np.reshape(featureTest, [-1, num_samples*num_channels])
+y_test = np.reshape(labelTest, [-1])
 
-w, b = ridgereg(y_train, X_train)
+model = RidgeRegression()
+w, b = model.fit(X_train, y_train)
 
-y_predict = np.dot(X_test, w) + b
+y_predict = model.predict(X_test)
 
 targetPredict = np.zeros([num_test, num_repeats], dtype=np.str)
 for trial in range(num_test):

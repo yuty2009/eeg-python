@@ -50,6 +50,20 @@ def onehot(labels, num_classes):
     return labels_onehot
 
 
+## Compute R square
+# y: N by 1 labels
+# X: N samples by [P1,P2,...,PN] features
+def rsquare(y, X):
+    dims = X.shape
+    NF = np.prod(dims[1:]).astype(int)
+    rr = np.zeros(NF)
+    X1 = np.reshape(X, [dims[0], -1])
+    for i in range(NF):
+        rr[i] = np.correlate(y, X1[:,i])[0]**2
+    if len(dims)>2: rr = np.reshape(rr,dims[1:])
+    return rr
+
+
 ## Calculate the Woodbury identity
 # (A + BD^{-1}C)^{-1} = A^{-1} - A^{-1}B(D+CA^{-1}B)^{-1}CA^{-1}
 # which is useful when A is large and diagonal, and hence easy to invert,
@@ -66,13 +80,28 @@ def woodburyinv(A,B,C,D):
     return WD
 
 
+## Compute the eigenvalues of X'*X by SVD
+# X is a N by P design matrix
+def myeig(X):
+    N, P = X.shape
+    U, S, VH = np.linalg.svd(X)
+    d1 = S**2
+    M = min(N,P)
+    d = np.zeros(P)
+    d[:M] = d1[:M]
+    return d
+
+
 if __name__ == "__main__":
     a = np.random.rand(5)
     A = sparse(range(5), range(5), a)
     X = np.random.rand(5,10)
     D = np.eye(10)
-
     Z1 = woodburyinv(A, X, X.T, D)
     Z2 = np.linalg.inv(A+np.matmul(np.matmul(X,np.linalg.inv(D)),X.T))
+
+    b = np.random.randn(4, 3)
+    d1, v1 = np.linalg.eig(np.dot(a.T, a))
+    d2 = myeig(a)
 
     pass

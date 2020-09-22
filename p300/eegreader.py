@@ -68,7 +68,7 @@ def extract_feature(data, target, sampleseg, chanset, dfs):
     feature = np.zeros([num_trials, num_repeats, num_chars, num_samples_used, num_channel_used])
     for trial in range(num_trials):
         target_index = matrix.find(target[trial])
-        target_row = int(np.floor((target_index)/6))
+        target_row = target_index // 6
         target_col = target_index - target_row * 6
         labels[trial, :, (target_col, target_row + 6)] = 1
 
@@ -109,9 +109,11 @@ if __name__ == '__main__':
         os.mkdir(datapath + 'processed/')
 
     fs = 240
+    f1 = 0.1
     f2 = 20
-    order = 6
-    fb, fa = butter(order, 2 * f2 / fs, btype='low')
+    order = 9
+    fb, fa = butter(order, 2*f2/fs, btype='low')
+    # fb, fa = butter(order, [2*f1/fs, 2*f2/fs], btype='band')
     show_filter(fb, fa, fs)
 
     dfs = 2

@@ -1,29 +1,35 @@
 # -*- coding: utf-8 -*-
 
-import keras
+import torch.nn as nn
 
 INPUT_SHAPE = [78, 64]
 MAP_NUM_LAYER1 = 10
 MAP_NUM_LAYER2 = 50
 BOTTLENECK_SIZE = 100
 
-class CNNModel(keras.Model):
+
+class CNNModel(nn.Module):
 
     def __init__(self, dropout=0.5):
-        super(CNNModel, self).__init__(name='cnn')
-        self.conv1 = keras.layers.Conv2D(MAP_NUM_LAYER1, [1, 64], input_shape=INPUT_SHAPE, activation='relu')
-        self.conv2 = keras.layers.Conv2D(MAP_NUM_LAYER2, [13, 1], strides=[13, 1], activation='relu')
-        self.flatten = keras.layers.Flatten()
-        self.dense1 = keras.layers.Dense(BOTTLENECK_SIZE, activation='relu')
-        self.dropout = keras.layers.Dropout(dropout)
-        self.out = keras.layers.Dense(1, activation='sigmoid')
+        super(CNNModel, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(1, MAP_NUM_LAYER1, kernel_size=(1, 64)),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(MAP_NUM_LAYER1, MAP_NUM_LAYER2, kernel_size=(13, 1), stride=(13, 1)),
+            nn.ReLU(inplace=True),
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(MAP_NUM_LAYER2*6, BOTTLENECK_SIZE),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(BOTTLENECK_SIZE, 1),
+            nn.Sigmoid()
+        )
 
-    def call(self, inputs):
-        x = self.conv1(inputs)
-        x = self.conv2(x)
-        x = self.flatten(x)
-        x = self.dense1(x)
-        x = self.dropout(x)
-        return self.out(x)
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
 
 

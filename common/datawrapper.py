@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 # import h5py
-import mne
 import numpy as np
 import scipy.io as sio
 
@@ -16,6 +15,7 @@ def read_matdata(filepath, keys):
 
 
 def read_cntdata(filepath):
+    import mne
     f = mne.io.read_raw_cnt(filepath, montage=None)
     clabs = f.ch_names
     events = mne.find_events(f, stim_channel=None)
@@ -31,6 +31,10 @@ class Dataset(object):
         self._indices = np.arange(self._num_examples)
         self._epochs_completed = 0
         self._index_in_epoch = 0
+        self._num_folds = 10 # 10-fold cross-validation default
+        self._num_examples_fold = self._num_examples // self._num_folds
+        self._folds_completed = 0
+        self._fold = 0
 
     @property
     def features(self):
@@ -47,6 +51,17 @@ class Dataset(object):
     @property
     def epochs_completed(self):
         return self._epochs_completed
+
+    @property
+    def folds_completed(self):
+        return self._folds_completed
+
+    def set_num_folds(self, num_folds):
+        self._num_folds = num_folds
+        self._num_examples_fold = self._num_examples // self._num_folds
+
+    def reset(self):
+        self._epochs_completed = 0
 
     def shuffle(self):
         perm = np.arange(self._num_examples)
@@ -74,28 +89,35 @@ class Dataset(object):
         return subsets
 
     def next_batch(self, batch_size, shuffle=True):
-        '''Return the next `batch_size` examples from this data set.'''
+        """Return the next `batch_size` examples from this data set"""
         start = self._index_in_epoch
         # Shuffle for the first epoch
-        if self._epochs_completed == 0 and start == 0 and shuffle:
+        if start == 0 and shuffle:
             self.shuffle()
         # Go to the next epoch
-        if start + batch_size > self._num_examples:
+        if start + batch_size >= self._num_examples:
             # Finished epoch
             self._epochs_completed += 1
             # Get the rest examples in this epoch
-            rest_num_examples = self._num_examples - start
-            indices_rest_part = self._indices[start:self._num_examples]
-            # Shuffle the data
-            if shuffle: self.shuffle()
-            # Start next epoch
-            start = 0
-            self._index_in_epoch = batch_size - rest_num_examples
-            end = self._index_in_epoch
-            indices_new_part = self._indices[start:end]
-            batch = self.get_portiondata(np.concatenate((indices_rest_part, indices_new_part), axis=0))
+            self._index_in_epoch = 0
+            end = self._num_examples
         else:
             self._index_in_epoch += batch_size
             end = self._index_in_epoch
-            batch = self.get_portiondata(self._indices[start:end])
-        return batch
+        indices_portion = self._indices[start:end]
+        return self.get_portiondata(indices_portion)
+
+    def next_fold(self, shuffle=True):
+        """Generate train set and test set for K-fold cross-validation"""
+        start = self._fold
+        # Shuffle for the first epoch
+        if start == 0 and shuffle:
+            self.shuffle()
+        indices_test = self._indices[self._fold * self._num_examples_fold:
+                                     (self._fold + 1) * self._num_examples_fold]
+        indices_train = np.setdiff1d(self._indices, indices_test)
+        self._fold += 1
+        if self._fold >= self._num_folds:
+            self._fold = 0
+        return self.get_portiondata(indices_train) + \
+               self.get_portiondata(indices_test)

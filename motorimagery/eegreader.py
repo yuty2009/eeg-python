@@ -46,7 +46,7 @@ def extract_variance(data, target, filter, sampleseg, chanset):
     num_samples_used = sample_end - sample_begin
     num_channel_used = len(chanset)
 
-    # show_filtering_result(filter[0], filter[1], data[0,:,0])
+    show_filtering_result(filter[0], filter[1], data[0,:,0])
 
     labels = target
     Rs = np.zeros([num_trials, num_channel_used, num_channel_used])
@@ -54,7 +54,7 @@ def extract_variance(data, target, filter, sampleseg, chanset):
         signal_epoch = data[i]
         signal_filtered = signal_epoch
         for j in range(num_channels):
-            signal_filtered[:, j] = filtfilt(filter[0], filter[1], signal_filtered[:, j])
+            signal_filtered[:, j] = signal.filtfilt(filter[0], filter[1], signal_filtered[:, j])
         signal_filtered = signal_filtered[sample_begin:sample_end, chanset]
         Rs[i] = np.dot(signal_filtered.T, signal_filtered)/np.trace(np.dot(signal_filtered.T, signal_filtered))
 
