@@ -2,7 +2,7 @@
 
 import numpy as np
 from p300.eegreader import *
-from common.regressor import *
+from common.linear import *
 
 # 6 by 6  matrix
 matrix='ABCDEF'+'GHIJKL'+'MNOPQR'+'STUVWX'+'YZ1234'+'56789_'
@@ -17,7 +17,8 @@ num_test = featureTest.shape[0]
 X_train = np.reshape(featureTrain, [-1, num_features])
 y_train = np.reshape(labelTrain, [-1])
 
-w, b = ridgereg(y_train, X_train)
+model = RidgeRegression()
+w, b = model.fit(X_train, y_train)
 
 X_test = np.reshape(featureTest, [-1, num_features])
 y_predict = np.dot(X_test, w) + b

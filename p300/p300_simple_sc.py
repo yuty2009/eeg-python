@@ -4,12 +4,12 @@ import numpy as np
 from eegreader_cnt import *
 from common.linear import *
 
-datapath = 'E:/eegdata/scutbci/p300speller/'
+datapath = 'e:/eegdata/scutbci/p300speller/'
 
 fs = 250
 f2 = 20
 order = 6
-fb, fa = butter(order, 2 * f2 / fs, btype='low')
+fb, fa = signal.butter(order, 2 * f2 / fs, btype='low')
 # show_filter(fb, fa, fs)
 
 dfs = 6

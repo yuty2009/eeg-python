@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+from scipy.stats import zscore
 from common.datawrapper import *
 from common.temporalfilter import *
-from scipy.stats import zscore
 
 
 def load_eegdata(filepath, filter):
@@ -62,7 +62,7 @@ def extract_feature(data, target, sampleseg, chanset, dfs):
             for char in range(num_chars):
                 signal_epoch = signal_trial[repeat, char, :, :]
                 signal_filtered = signal_epoch[sample_begin:sample_end, chanset]
-                signal_downsampled = np.transpose(decimate(signal_filtered.T, dfs, zero_phase=True))
+                signal_downsampled = np.transpose(signal.decimate(signal_filtered.T, dfs, zero_phase=True))
                 signal_normalized = np.zeros(signal_downsampled.shape)
                 for c in range(num_channel_used):
                     if np.max(signal_downsampled[:, c]) == np.min(signal_downsampled[:, c]):
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     fs = 250
     f2 = 20
     order = 6
-    fb, fa = butter(order, 2 * f2 / fs, btype='low')
+    fb, fa = signal.butter(order, 2 * f2 / fs, btype='low')
     # show_filter(fb, fa, fs)
 
     dfs = 6

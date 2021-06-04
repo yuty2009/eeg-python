@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import re
+import math
+import time
+import string
+import unicodedata
 import numpy as np
 
 
@@ -43,7 +48,7 @@ def sparse(ind1, ind2, values):
 
 ## Generate one-hot coded labels
 def onehot(labels, num_classes):
-    num_labels = labels.shape[0]
+    num_labels = len(labels)
     index_offset = np.arange(num_labels) * num_classes
     labels_onehot = np.zeros((num_labels, num_classes))
     labels_onehot.flat[index_offset + labels.ravel()] = 1
@@ -51,9 +56,9 @@ def onehot(labels, num_classes):
 
 
 ## Compute R square
-# y: N by 1 labels
 # X: N samples by [P1,P2,...,PN] features
-def rsquare(y, X):
+# y: N by 1 labels
+def rsquare(X, y):
     dims = X.shape
     NF = np.prod(dims[1:]).astype(int)
     rr = np.zeros(NF)
@@ -92,6 +97,54 @@ def myeig(X):
     return d
 
 
+def calc_confusion_matrix(yt, yp, num_classes):
+    confusion = np.zeros((num_classes, num_classes))
+    for yt1, yp1 in zip(yt, yp):
+        confusion[yt1][yp1] += 1
+    # Normalize by dividing every row by its sum
+    for i in range(num_classes):
+        confusion[i] = confusion[i] / (np.sum(confusion[i]) + 1e-9)
+    return confusion
+
+
+def plot_matrix(mat, xlabels=None, ylabels=None):
+    from matplotlib import pyplot as plt
+    from matplotlib import ticker as ticker
+
+    # Set up plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(mat)
+    fig.colorbar(cax)
+
+    # Set up axes
+    xlabels = '' if xlabels is None else xlabels
+    ylabels = '' if ylabels is None else ylabels
+    ax.set_xticklabels([''] + xlabels, rotation=90)
+    ax.set_yticklabels([''] + ylabels)
+
+    # Force label at every tick
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+
+    # sphinx_gallery_thumbnail_number = 2
+    plt.show()
+
+
+def as_minutes(s):
+    m = math.floor(s / 60)
+    s -= m * 60
+    return '%dm %ds' % (m, s)
+
+
+def time_since(since, percent):
+    now = time.time()
+    s = now - since
+    es = s / percent
+    rs = es - s
+    return '%s (- %s)' % (as_minutes(s), as_minutes(rs))
+
+
 if __name__ == "__main__":
     a = np.random.rand(5)
     A = sparse(range(5), range(5), a)
@@ -101,7 +154,9 @@ if __name__ == "__main__":
     Z2 = np.linalg.inv(A+np.matmul(np.matmul(X,np.linalg.inv(D)),X.T))
 
     b = np.random.randn(4, 3)
-    d1, v1 = np.linalg.eig(np.dot(a.T, a))
-    d2 = myeig(a)
+    d1, v1 = np.linalg.eig(np.dot(b.T, b))
+    d2 = myeig(b)
 
-    pass
+    mat = np.random.randn(5,5)
+    labels = ['one', 'two', 'three', 'four', 'five']
+    plot_matrix(mat, labels, labels)
