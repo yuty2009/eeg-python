@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 
 import numpy as np
+from sklearn import svm
 from common.linear import *
 from motorimagery.eegreader import *
 
@@ -11,9 +12,10 @@ subjects = ['aa', 'al', 'av', 'aw', 'ay']
 fs = 100
 f1 = 7
 f2 = 30
-order = 6
-fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='band')
-show_filter(fb, fa, fs)
+order = 5
+# fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='bandpass')
+fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
+# show_filter(fb, fa, fs)
 
 sampleseg = [50, 350]
 chanset = np.arange(118)
@@ -40,8 +42,10 @@ for ss in range(len(subjects)):
     y_train = labelTrain
     y_train[np.argwhere(y_train == 2)] = -1
 
-    model = LogisticRegression()
-    w, b = model.fit(X_train, y_train)
+    model = svm.SVC(kernel='linear')
+    model.fit(X_train, y_train)
+    # model = LogisticRegression()
+    # w, b = model.fit(X_train, y_train)
 
     X_test = np.zeros([num_test, num_features])
     for i in range(num_test):

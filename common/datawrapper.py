@@ -5,12 +5,15 @@ import numpy as np
 import scipy.io as sio
 
 
-def read_matdata(filepath, keys):
+def read_matdata(filepath, keys=None):
     data = {}
     f = sio.loadmat(filepath)
     # f = h5py.File(filepath, 'r')
-    for key in keys:
-        data[key] = f[key]
+    if keys == None:
+        data = f
+    else:
+        for key in keys:
+            data[key] = f[key]
     return data
 
 
@@ -21,6 +24,19 @@ def read_cntdata(filepath):
     events = mne.find_events(f, stim_channel=None)
     data, times = f[:, :]
     return data, events, clabs
+
+
+def read_gdfdata(filepath):
+    import mne
+    f = mne.io.read_raw_gdf(filepath)
+    clabs = f.ch_names
+    event_array, event_id = mne.events_from_annotations(f)
+    event_value = {v: int(k) for k, v in event_id.items()}
+    events = dict()
+    events['pos'] = event_array[:, 0]
+    events['type'] = np.array([event_value[e] for e in event_array[:, 2]])
+    data, times = f[:, :]
+    return np.transpose(data), events, clabs
 
 
 class Dataset(object):

@@ -1,41 +1,44 @@
 # -*- coding: utf-8 -*-
 
+import os
 import numpy as np
 from common.datawrapper import *
 from common.spatialfilter import *
 from common.temporalfilter import *
 
 
-def load_eegdata(filepath, labelpath):
-    data = read_matdata(filepath, ['cnt', 'mrk'])
-    labeldata = read_matdata(labelpath, ['true_y'])
-    cnt = 0.1*data['cnt']
-    pos = data['mrk']['pos'][0,0][0]
-    code = data['mrk']['y'][0,0][0]
-    label = labeldata['true_y'][0]
+def load_eegdata(fdatatrain, flabeltrain, fdatatest, flabeltest):
+    s, events, clabs = read_gdfdata(fdatatrain)
+    pos = events['pos']
+    code = events['type']
+    indices = np.squeeze(np.argwhere(code == 768))
 
-    code[np.argwhere(np.isnan(code))] = 0
-    num_train = len(np.argwhere(code >= 1))
-    num_test = 280 - num_train
-    num_samples = 350
-    num_channels = cnt.shape[1]
-
-    targetTrain = np.zeros(num_train)
+    num_train = len(indices)
+    fs = 250
+    num_samples = 4 * fs # 4s data
+    num_channels = s.shape[1]
     dataTrain = np.zeros([num_train, num_samples, num_channels])
     for i in range(num_train):
-        begin = pos[i]
+        begin = pos[indices[i]] + 2*fs # 2 seconds prepare
         end = begin + num_samples
-        dataTrain[i,:,:] = cnt[begin:end,:]
-        targetTrain[i] = code[i]
+        dataTrain[i,:,:] = s[begin:end,:]
+    labeldata = read_matdata(flabeltrain, ['classlabel'])
+    targetTrain = np.array(np.squeeze(labeldata['classlabel']), dtype=np.int)
 
-    targetTest = np.zeros(num_test)
+    s, events, clabs = read_gdfdata(fdatatest)
+    pos = events['pos']
+    code = events['type']
+    indices = np.squeeze(np.argwhere(code == 768))
+
+    num_test = len(indices)
     dataTest = np.zeros([num_test, num_samples, num_channels])
     for i in range(num_test):
-        begin = pos[num_train+i]
+        begin = pos[indices[i]] + 2*fs # 2 seconds prepare
         end = begin + num_samples
-        dataTest[i,:,:] = cnt[begin:end,:]
-        targetTest[i] = label[num_train+i]
-
+        dataTest[i,:,:] = s[begin:end,:]
+    labeldata = read_matdata(flabeltest, ['classlabel'])
+    targetTest = np.array(np.squeeze(labeldata['classlabel']), dtype=np.int)
+    
     return dataTrain, targetTrain, dataTest, targetTest
 
 
@@ -68,7 +71,7 @@ def extract_variance_multiband(data, target, bands, sampleseg, chanset):
     num_samples_used = sample_end - sample_begin
     num_channel_used = len(chanset)
 
-    fs = 100
+    fs = 250
     order = 5
     num_bands = len(bands)
     Rss = []
@@ -98,8 +101,8 @@ def load_dataset(datapath, subject):
 
 if __name__ == '__main__':
 
-    datapath = 'E:/bcicompetition/bci2005/IVa/'
-    subjects = ['aa', 'al', 'av', 'aw', 'ay']
+    datapath = 'E:/bcicompetition/bci2008/IIa/'
+    subjects = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09']
 
     import os
     if not os.path.isdir(datapath + 'processed/'):
@@ -107,11 +110,13 @@ if __name__ == '__main__':
 
     for ss in range(len(subjects)):
         subject = subjects[ss]
-        filepath = datapath+'data_set_IVa_'+subject+'.mat'
-        labelpath = datapath+'true_labels_'+subject+'.mat'
+        fdatatrain = datapath+subject+'T.gdf'
+        flabeltrain = datapath+subject+'T.mat'
+        fdatatest = datapath+subject+'E.gdf'
+        flabeltest = datapath+subject+'E.mat'
 
         print('Load and extract continuous EEG into epochs for subject '+subject)
-        dataTrain, targetTrain, dataTest, targetTest = load_eegdata(filepath, labelpath)
+        dataTrain, targetTrain, dataTest, targetTest = load_eegdata(fdatatrain, flabeltrain, fdatatest, flabeltest)
 
         np.savez(datapath+'processed/'+subject+'.npz',
                  dataTrain=dataTrain, targetTrain=targetTrain, dataTest=dataTest, targetTest=targetTest)

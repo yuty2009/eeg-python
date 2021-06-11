@@ -17,7 +17,7 @@ def CSP1(R1, R2):
     V1, U1 = np.linalg.eig(R)
     P = np.dot(np.diag(V1**(-1/2)), U1.T)
     S1 = np.dot(np.dot(P, R1), P.T)
-    # S2 = np.dot(P, np.dot(R2, P.T))
+    # S2 = np.dot(np.dot(P, R2), P.T)
     V2, U2 = np.linalg.eig(S1)
     W = np.dot(P.T, U2)
     ind = np.argsort(V2)

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 import numpy as np
 from common.datawrapper import *
 from common.spatialfilter import *
@@ -7,34 +8,50 @@ from common.temporalfilter import *
 
 
 def load_eegdata(filepath, labelpath):
-    data = read_matdata(filepath, ['cnt', 'mrk'])
-    labeldata = read_matdata(labelpath, ['true_y'])
-    cnt = 0.1*data['cnt']
-    pos = data['mrk']['pos'][0,0][0]
-    code = data['mrk']['y'][0,0][0]
-    label = labeldata['true_y'][0]
+    label_key = os.path.basename(labelpath)
+    label_key = label_key[:-4]
+    labeldata = read_matdata(labelpath, [label_key])
+    label = labeldata[label_key]
 
-    code[np.argwhere(np.isnan(code))] = 0
-    num_train = len(np.argwhere(code >= 1))
-    num_test = 280 - num_train
-    num_samples = 350
-    num_channels = cnt.shape[1]
+    data = read_matdata(filepath, ['s', 'HDR'])
+    s = data['s']
+    fs = data['HDR']['SampleRate'][0][0][0][0]
+    pos = data['HDR']['TRIG'][0][0].squeeze()
+    code = data['HDR']['Classlabel'][0][0].squeeze()
+    index_train = np.squeeze(np.argwhere(~np.isnan(code)))
+    index_test = np.squeeze(np.argwhere(np.isnan(code)))
 
-    targetTrain = np.zeros(num_train)
+    num_train = len(index_train)
+    num_test = len(index_test)
+    num_samples = 4 * fs # 4s data
+    num_channels = s.shape[1]
+
+    # There are NaNs in the data. We replace them by interpolation.
+    for c in range(num_channels):
+        sc = s[:, c]
+        nans = np.isnan(sc)
+        inds = np.arange(len(sc))
+        if any(nans):
+            sc[nans] = np.interp(inds[nans], inds[~nans], sc[~nans])
+            s[:, c] = sc
+
+    targetTrain = np.zeros(num_train, dtype=np.int)
     dataTrain = np.zeros([num_train, num_samples, num_channels])
     for i in range(num_train):
-        begin = pos[i]
+        ii = index_train[i]
+        begin = pos[ii] + 3*fs # 3 seconds prepare
         end = begin + num_samples
-        dataTrain[i,:,:] = cnt[begin:end,:]
-        targetTrain[i] = code[i]
+        dataTrain[i,:,:] = s[begin:end,:]
+        targetTrain[i] = code[ii]
 
-    targetTest = np.zeros(num_test)
+    targetTest = np.zeros(num_test, dtype=np.int)
     dataTest = np.zeros([num_test, num_samples, num_channels])
     for i in range(num_test):
-        begin = pos[num_train+i]
+        ii = index_test[i]
+        begin = pos[ii] + 3*fs # 3 seconds prepare
         end = begin + num_samples
-        dataTest[i,:,:] = cnt[begin:end,:]
-        targetTest[i] = label[num_train+i]
+        dataTest[i,:,:] = s[begin:end,:]
+    targetTest = np.squeeze(label[index_test]).astype(np.int)
 
     return dataTrain, targetTrain, dataTest, targetTest
 
@@ -68,7 +85,7 @@ def extract_variance_multiband(data, target, bands, sampleseg, chanset):
     num_samples_used = sample_end - sample_begin
     num_channel_used = len(chanset)
 
-    fs = 100
+    fs = 250
     order = 5
     num_bands = len(bands)
     Rss = []
@@ -98,8 +115,8 @@ def load_dataset(datapath, subject):
 
 if __name__ == '__main__':
 
-    datapath = 'E:/bcicompetition/bci2005/IVa/'
-    subjects = ['aa', 'al', 'av', 'aw', 'ay']
+    datapath = 'E:/bcicompetition/bci2005/IIIa/'
+    subjects = ['k3', 'k6', 'l1']
 
     import os
     if not os.path.isdir(datapath + 'processed/'):
@@ -107,8 +124,8 @@ if __name__ == '__main__':
 
     for ss in range(len(subjects)):
         subject = subjects[ss]
-        filepath = datapath+'data_set_IVa_'+subject+'.mat'
-        labelpath = datapath+'true_labels_'+subject+'.mat'
+        filepath = datapath+subject+'b.mat'
+        labelpath = datapath+'true_label_'+subject+'.mat'
 
         print('Load and extract continuous EEG into epochs for subject '+subject)
         dataTrain, targetTrain, dataTest, targetTest = load_eegdata(filepath, labelpath)
