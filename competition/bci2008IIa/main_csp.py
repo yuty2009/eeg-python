@@ -36,12 +36,14 @@ for ss in range(len(subjects)):
     print('Extract CSP features from epochs for subject ' + subject)
     for tt in range(len(tasks)):
         labels = tasks[tt]
-        indexTrain1 = np.squeeze(np.argwhere((targetTrain == labels[0]) | (targetTrain == labels[1])))
-        indexTest1 = np.squeeze(np.argwhere((targetTest == labels[0]) | (targetTest == labels[1])))
-        dataTrain1 = dataTrain[indexTrain1,:,:]
-        dataTest1 = dataTest[indexTest1,:,:]
-        RsTrain, labelTrain = extract_variance(dataTrain1, targetTrain[indexTrain1], [fb, fa], sampleseg, chanset)
-        RsTest, labelTest = extract_variance(dataTest1, targetTest[indexTest1], [fb, fa], sampleseg, chanset)
+        indexTrain1 = np.argwhere((targetTrain == labels[0]) | (targetTrain == labels[1]))
+        indexTest1 = np.argwhere((targetTest == labels[0]) | (targetTest == labels[1]))
+        dataTrain1 = dataTrain[indexTrain1.ravel(),:,:]
+        dataTest1 = dataTest[indexTest1.ravel(),:,:]
+        targetTrain1 = targetTrain[indexTrain1.ravel()]
+        targetTest1 = targetTest[indexTest1.ravel()]
+        RsTrain, labelTrain = extract_variance(dataTrain1, targetTrain1, [fb, fa], sampleseg, chanset)
+        RsTest, labelTest = extract_variance(dataTest1, targetTest1, [fb, fa], sampleseg, chanset)
         num_train, num_channels = RsTrain.shape[0:2]
         num_test = RsTest.shape[0]
 

@@ -3,7 +3,7 @@
 import pickle
 import numpy as np
 from common.datawrapper import *
-from common.temporalfilter import *
+from common.signalproc import *
 from common.timefreq import *
 from scipy.stats import zscore
 

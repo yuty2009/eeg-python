@@ -3,15 +3,15 @@
 import os
 import numpy as np
 from common.datawrapper import *
+from common.signalproc import *
 from common.spatialfilter import *
-from common.temporalfilter import *
 
 
 def load_eegdata(fdatatrain, flabeltrain, fdatatest, flabeltest):
     s, events, clabs = read_gdfdata(fdatatrain)
     pos = events['pos']
     code = events['type']
-    indices = np.squeeze(np.argwhere(code == 768))
+    indices = np.argwhere(code == 768)
 
     num_train = len(indices)
     fs = 250
@@ -19,7 +19,7 @@ def load_eegdata(fdatatrain, flabeltrain, fdatatest, flabeltest):
     num_channels = s.shape[1]
     dataTrain = np.zeros([num_train, num_samples, num_channels])
     for i in range(num_train):
-        begin = pos[indices[i]] + 2*fs # 2 seconds prepare
+        begin = pos[indices[i, 0]] + 2*fs # 2 seconds prepare
         end = begin + num_samples
         dataTrain[i,:,:] = s[begin:end,:]
     labeldata = read_matdata(flabeltrain, ['classlabel'])
@@ -28,12 +28,12 @@ def load_eegdata(fdatatrain, flabeltrain, fdatatest, flabeltest):
     s, events, clabs = read_gdfdata(fdatatest)
     pos = events['pos']
     code = events['type']
-    indices = np.squeeze(np.argwhere(code == 768))
+    indices = np.argwhere(code == 768)
 
     num_test = len(indices)
     dataTest = np.zeros([num_test, num_samples, num_channels])
     for i in range(num_test):
-        begin = pos[indices[i]] + 2*fs # 2 seconds prepare
+        begin = pos[indices[i, 0]] + 2*fs # 2 seconds prepare
         end = begin + num_samples
         dataTest[i,:,:] = s[begin:end,:]
     labeldata = read_matdata(flabeltest, ['classlabel'])

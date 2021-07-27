@@ -3,6 +3,7 @@
 import numpy as np
 from sklearn import svm
 from common.linear import *
+from common.riemann.riemann import *
 from motorimagery.eegreader import *
 
 
@@ -17,10 +18,7 @@ order = 5
 fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
 # show_filter(fb, fa, fs)
 
-timewin = [1.0, 4.0] # [0.5, 3.5] actually due to 0.5 s pre-task
-sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
-n_timepoints = sampleseg[1] - sampleseg[0]
-
+sampleseg = [50, 350]
 chanset = np.arange(118)
 
 num_filters = 6
@@ -38,29 +36,27 @@ for ss in range(len(subjects)):
 
     WCSP = trainCSP2(RsTrain, labelTrain, num_filters)
 
-    X_train = np.zeros([num_train, num_filters])
+    RcspTrain = np.zeros((num_train, num_filters, num_filters))
     for i in range(num_train):
-        temp = np.abs(np.diag(np.dot(np.dot(WCSP.T, RsTrain[i]), WCSP)))
-        temp = np.log(temp / np.sum(temp))
-        X_train[i, :] = temp
+        RcspTrain[i, :, :] = np.dot(np.dot(WCSP.T, RsTrain[i]), WCSP)
     y_train = labelTrain
-    y_train[np.argwhere(y_train == 2)] = -1
+    index1 = np.argwhere(y_train == 1)
+    index2 = np.argwhere(y_train == 2)
+    C1 = riemannmean(RcspTrain[index1.flatten(), :, :])
+    C2 = riemannmean(RcspTrain[index2.flatten(), :, :])
 
-    model = svm.SVC(kernel='linear')
-    model.fit(X_train, y_train)
-    # model = LogisticRegression()
-    # w, b = model.fit(X_train, y_train)
-
-    X_test = np.zeros([num_test, num_filters])
+    RcspTest = np.zeros((num_test, num_filters, num_filters))
     for i in range(num_test):
-        temp = np.abs(np.diag(np.dot(np.dot(WCSP.T, RsTest[i]), WCSP)))
-        temp = np.log(temp / np.sum(temp))
-        X_test[i, :] = temp
+        RcspTest[i, :, :] = np.dot(np.dot(WCSP.T, RsTest[i]), WCSP)
     y_test = labelTest
-    y_test[np.argwhere(y_test == 2)] = -1
-
-    y_pred = model.predict(X_test)
-    # y_pred, _ = model.predict(X_test)
+    y_pred = np.zeros_like(y_test)
+    for i in range(num_test):
+        dist1 = riemanndistance(C1, RcspTest[i, :, :])
+        dist2 = riemanndistance(C2, RcspTest[i, :, :])
+        if dist1 <= dist2:
+            y_pred[i] = 1
+        else:
+            y_pred[i] = 2
 
     accTest[ss] = np.mean(np.array(y_pred == y_test).astype(int))
 

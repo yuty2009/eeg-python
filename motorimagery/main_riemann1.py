@@ -3,6 +3,8 @@
 import numpy as np
 from sklearn import svm
 from common.linear import *
+from common.bayesian.linear import *
+from common.riemann.riemann import *
 from motorimagery.eegreader import *
 
 
@@ -17,10 +19,7 @@ order = 5
 fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
 # show_filter(fb, fa, fs)
 
-timewin = [1.0, 4.0] # [0.5, 3.5] actually due to 0.5 s pre-task
-sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
-n_timepoints = sampleseg[1] - sampleseg[0]
-
+sampleseg = [50, 350]
 chanset = np.arange(118)
 
 num_filters = 6
@@ -38,29 +37,28 @@ for ss in range(len(subjects)):
 
     WCSP = trainCSP2(RsTrain, labelTrain, num_filters)
 
-    X_train = np.zeros([num_train, num_filters])
+    RcspTrain = np.zeros((num_train, num_filters, num_filters))
     for i in range(num_train):
-        temp = np.abs(np.diag(np.dot(np.dot(WCSP.T, RsTrain[i]), WCSP)))
-        temp = np.log(temp / np.sum(temp))
-        X_train[i, :] = temp
+        RcspTrain[i, :, :] = np.dot(np.dot(WCSP.T, RsTrain[i]), WCSP)
+    Cmean = riemannmean(RcspTrain)
+    X_train = tangentspace(RcspTrain, Cmean)
     y_train = labelTrain
     y_train[np.argwhere(y_train == 2)] = -1
 
-    model = svm.SVC(kernel='linear')
-    model.fit(X_train, y_train)
-    # model = LogisticRegression()
-    # w, b = model.fit(X_train, y_train)
+    # model = svm.SVC(kernel='linear')
+    # model.fit(X_train, y_train)
+    model = BayesARDLogisticRegression()
+    w, b = model.fit(X_train, y_train)
 
-    X_test = np.zeros([num_test, num_filters])
+    RcspTest = np.zeros((num_test, num_filters, num_filters))
     for i in range(num_test):
-        temp = np.abs(np.diag(np.dot(np.dot(WCSP.T, RsTest[i]), WCSP)))
-        temp = np.log(temp / np.sum(temp))
-        X_test[i, :] = temp
+        RcspTest[i, :, :] = np.dot(np.dot(WCSP.T, RsTest[i]), WCSP)
+    X_test = tangentspace(RcspTest, Cmean)
     y_test = labelTest
     y_test[np.argwhere(y_test == 2)] = -1
-
-    y_pred = model.predict(X_test)
-    # y_pred, _ = model.predict(X_test)
+    
+    # y_pred = model.predict(X_test)
+    y_pred, _ = model.predict(X_test)
 
     accTest[ss] = np.mean(np.array(y_pred == y_test).astype(int))
 

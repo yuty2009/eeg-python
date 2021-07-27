@@ -3,7 +3,7 @@
 import numpy as np
 from scipy.stats import zscore
 from common.datawrapper import *
-from common.temporalfilter import *
+from common.signalproc import *
 
 
 def load_eegdata(filepath, filter):

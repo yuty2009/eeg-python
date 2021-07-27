@@ -97,6 +97,17 @@ def myeig(X):
     return d
 
 
+# Turn a Unicode string to plain ASCII, thanks to https://stackoverflow.com/a/518232/2809427
+def unicode_to_ascii(s):
+    all_letters = string.ascii_letters + " .,;'"
+    n_letters = len(all_letters)
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', s)
+        if unicodedata.category(c) != 'Mn'
+        and c in all_letters
+    )
+    
+
 def calc_confusion_matrix(yt, yp, num_classes):
     confusion = np.zeros((num_classes, num_classes))
     for yt1, yp1 in zip(yt, yp):
@@ -134,14 +145,14 @@ def plot_matrix(mat, xlabels=None, ylabels=None):
 def as_minutes(s):
     m = math.floor(s / 60)
     s -= m * 60
-    return '%dm %ds' % (m, s)
+    return '%dm %.1fs' % (m, s)
 
 
-def time_since(since, percent):
+def time_since(since, percent_stride, percent_process):
     now = time.time()
     s = now - since
-    es = s / percent
-    rs = es - s
+    es = s / percent_stride
+    rs = es * (1 - percent_process)
     return '%s (- %s)' % (as_minutes(s), as_minutes(rs))
 
 

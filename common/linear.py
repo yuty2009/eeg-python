@@ -134,7 +134,7 @@ class LogisticRegression(LinearModel):
             # Iterative reweighted least square (IRLS) by Newton-Raphson
             # iterative optimization scheme.
             # w_new = w_old - (PHI'*R*PHI)^(-1)*PHI'*(y-t);
-            y[y == -1] = 0  # here class label should be in {0, 1}
+            y[np.argwhere(y == -1)] = 0  # here class label should be in {0, 1}
             w[0] = np.log(np.mean(y) / (1 - np.mean(y)))
 
             # stop conditions
@@ -220,7 +220,7 @@ class SoftmaxClassifier(LinearModel):
                                            theta, args=(self.wd, PHI, y))
         W = np.reshape(opttheta, W.shape)
         self.W, self.b = W[1:,:], W[0, :]
-        return W
+        return self.W, self.b
 
     def predict(self, X, args=None):
         assert self.W is not None, 'Please fit the model before use'

@@ -3,7 +3,7 @@
 import numpy as np
 import scipy.signal as signal
 from common.datawrapper import *
-from common.temporalfilter import *
+from common.signalproc import *
 
 
 def load_dataset(filepath, labelpath):

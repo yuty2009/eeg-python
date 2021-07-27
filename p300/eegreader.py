@@ -2,7 +2,7 @@
 
 import numpy as np
 from common.datawrapper import *
-from common.temporalfilter import *
+from common.signalproc import *
 from scipy.stats import zscore
 
 

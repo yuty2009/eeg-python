@@ -3,8 +3,8 @@
 import os
 import numpy as np
 from common.datawrapper import *
+from common.signalproc import *
 from common.spatialfilter import *
-from common.temporalfilter import *
 
 
 def load_eegdata(filepath, labelpath):
@@ -18,8 +18,8 @@ def load_eegdata(filepath, labelpath):
     fs = data['HDR']['SampleRate'][0][0][0][0]
     pos = data['HDR']['TRIG'][0][0].squeeze()
     code = data['HDR']['Classlabel'][0][0].squeeze()
-    index_train = np.squeeze(np.argwhere(~np.isnan(code)))
-    index_test = np.squeeze(np.argwhere(np.isnan(code)))
+    index_train = np.argwhere(~np.isnan(code))
+    index_test = np.argwhere(np.isnan(code))
 
     num_train = len(index_train)
     num_test = len(index_test)
@@ -38,7 +38,7 @@ def load_eegdata(filepath, labelpath):
     targetTrain = np.zeros(num_train, dtype=np.int)
     dataTrain = np.zeros([num_train, num_samples, num_channels])
     for i in range(num_train):
-        ii = index_train[i]
+        ii = index_train[i, 0]
         begin = pos[ii] + 3*fs # 3 seconds prepare
         end = begin + num_samples
         dataTrain[i,:,:] = s[begin:end,:]
@@ -47,7 +47,7 @@ def load_eegdata(filepath, labelpath):
     targetTest = np.zeros(num_test, dtype=np.int)
     dataTest = np.zeros([num_test, num_samples, num_channels])
     for i in range(num_test):
-        ii = index_test[i]
+        ii = index_test[i, 0]
         begin = pos[ii] + 3*fs # 3 seconds prepare
         end = begin + num_samples
         dataTest[i,:,:] = s[begin:end,:]

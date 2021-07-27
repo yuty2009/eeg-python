@@ -1,29 +1,55 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
-from common.datawrapper import *
+import torch
+from torch.utils.data import Dataset
+from common.datawrapper import read_matdata
+from common.signalproc import *
 from common.spatialfilter import *
-from common.temporalfilter import *
+
+
+# translate epoch data (n, c, t) into grayscale images (n, 1, c, t)
+class TransformEpoch(object):
+    def __call__(self, epoch):
+        epoch = torch.Tensor(epoch)
+        return torch.unsqueeze(epoch, dim=0)
+
+
+class EEGDataset(Dataset):
+    def __init__(self, epochs, labels, transforms=None):
+        if transforms == None:
+            self.epochs = epochs
+        else:
+            self.epochs = [transforms(epoch) for epoch in epochs]
+        self.labels = torch.Tensor(labels - 1).long() # label {1, 2} to {0, 1}
+
+    def __getitem__(self, idx):
+        return self.epochs[idx], self.labels[idx]
+
+    def __len__(self):
+        return len(self.labels)
 
 
 def load_eegdata(filepath, labelpath):
-    data = read_matdata(filepath, ['cnt', 'mrk'])
+    data = read_matdata(filepath, ['cnt', 'mrk', 'nfo'])
     labeldata = read_matdata(labelpath, ['true_y'])
     cnt = 0.1*data['cnt']
     pos = data['mrk']['pos'][0,0][0]
     code = data['mrk']['y'][0,0][0]
+    fs = data['nfo']['fs'][0,0][0]
     label = labeldata['true_y'][0]
 
     code[np.argwhere(np.isnan(code))] = 0
     num_train = len(np.argwhere(code >= 1))
     num_test = 280 - num_train
-    num_samples = 350
+    timewin = [-0.5, 4.0]
+    sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
+    num_samples = sampleseg[1] - sampleseg[0]
     num_channels = cnt.shape[1]
 
     targetTrain = np.zeros(num_train)
     dataTrain = np.zeros([num_train, num_samples, num_channels])
     for i in range(num_train):
-        begin = pos[i]
+        begin = pos[i] + sampleseg[0]
         end = begin + num_samples
         dataTrain[i,:,:] = cnt[begin:end,:]
         targetTrain[i] = code[i]
@@ -37,6 +63,27 @@ def load_eegdata(filepath, labelpath):
         targetTest[i] = label[num_train+i]
 
     return dataTrain, targetTrain, dataTest, targetTest
+
+
+def extract_rawfeature(data, target, filter, sampleseg, chanset):
+    num_trials, num_samples, num_channels = data.shape
+    sample_begin = sampleseg[0]
+    sample_end = sampleseg[1]
+    num_samples_used = sample_end - sample_begin
+    num_channel_used = len(chanset)
+
+    # show_filtering_result(filter[0], filter[1], data[0,:,0])
+
+    labels = target
+    features = np.zeros([num_trials, num_samples_used, num_channel_used])
+    for i in range(num_trials):
+        signal_epoch = data[i]
+        signal_filtered = signal_epoch
+        for j in range(num_channels):
+            signal_filtered[:, j] = signal.filtfilt(filter[0], filter[1], signal_filtered[:, j])
+        features[i] = signal_filtered[sample_begin:sample_end, chanset]
+
+    return features, labels
 
 
 def extract_variance(data, target, filter, sampleseg, chanset):

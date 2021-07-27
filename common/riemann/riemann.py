@@ -4,10 +4,23 @@
 # https://github.com/pyRiemann/pyRiemann/
 
 import numpy
+import scipy
 from common.riemann.base import *
 
 
-def mean_riemann(covmats, tol=10e-9, maxiter=50, init=None):
+def riemanndistance(A, B):
+    """Riemannian distance between two covariance matrices A and B.
+    .. math::
+            d = {\left( \sum_i \log(\lambda_i)^2 \\right)}^{-1/2}
+    where :math:`\lambda_i` are the joint eigenvalues of A and B
+    :param A: First covariance matrix
+    :param B: Second covariance matrix
+    :returns: Riemannian distance between A and B
+    """
+    return numpy.sqrt((numpy.log(scipy.linalg.eigvalsh(A, B))**2).sum())
+
+    
+def riemannmean(covmats, tol=1e-8, maxiter=50, init=None):
     """Return the mean covariance matrix according to the Riemannian metric.
     The procedure is similar to a gradient descent minimizing the sum of
     riemannian distance to the mean.
@@ -26,35 +39,29 @@ def mean_riemann(covmats, tol=10e-9, maxiter=50, init=None):
         C = numpy.mean(covmats, axis=0)
     else:
         C = init
+    eps = 1e-9
+    epsI = eps*numpy.eye(Ne)
+
     k = 0
-    nu = 1.0
-    tau = numpy.finfo(numpy.float64).max
     crit = numpy.finfo(numpy.float64).max
     # stop when J<10^-9 or max iteration = 50
-    while (crit > tol) and (k < maxiter) and (nu > tol):
+    while (crit > tol) and (k < maxiter):
         k = k + 1
         C12 = sqrtm(C)
         Cm12 = invsqrtm(C)
         J = numpy.zeros((Ne, Ne))
-
         for index in range(Nt):
-            tmp = numpy.dot(numpy.dot(Cm12, covmats[index, :, :]), Cm12)
+            tmp = numpy.dot(numpy.dot(Cm12, covmats[index, :, :]+epsI), Cm12)
             # J += sample_weight[index] * logm(tmp)
             J += logm(tmp)
+        J = J/Nt
 
         crit = numpy.linalg.norm(J, ord='fro')
-        h = nu * crit
-        C = numpy.dot(numpy.dot(C12, expm(nu * J)), C12)
-        if h < tau:
-            nu = 0.95 * nu
-            tau = h
-        else:
-            nu = 0.5 * nu
-
+        C = numpy.dot(numpy.dot(C12, expm(J)), C12)
     return C
 
 
-def tangent_space(covmats, Cref):
+def tangentspace(covmats, Cref):
     """Project a set of covariance matrices in the tangent space. according to
     the reference point Cref
     :param covmats: np.ndarray
@@ -78,7 +85,7 @@ def tangent_space(covmats, Cref):
     return T
 
 
-def untangent_space(T, Cref):
+def untangentspace(T, Cref):
     """Project a set of Tangent space vectors back to the manifold.
     :param T: np.ndarray
         the Tangent space , a matrix of Ntrials X (channels * (channels + 1)/2)
