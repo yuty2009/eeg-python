@@ -5,12 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: 当前文件",
+            "name": "Python: Current File (Integrated Terminal)",
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "console": "integratedTerminal",
-            "env": {"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"}
+            "console": "integratedTerminal"
         }
     ]
 }

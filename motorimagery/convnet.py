@@ -12,31 +12,27 @@ class CSPNet(nn.Module):
     """
     def __init__(
         self, n_timepoints, n_channels, n_classes, dropout = 0.5,
-        n_filters_time = 40, filter_size_time = 25,
-        n_filters_selected = 100,
+        n_filters_time = 16, filter_size_time = 25,
+        n_filters_spatial = -1
     ):
         super().__init__()
         assert filter_size_time <= n_timepoints, "Temporal filter size error"
+        if n_filters_spatial <= 0: n_filters_spatial = n_filters_time*n_channels
 
         self.features = nn.Sequential(
             # temporal filtering
             nn.Conv2d(1, n_filters_time, (filter_size_time, 1)),
-            Expression(cov),
             # spatial filtering
-            nn.Conv2d(n_filters_time, n_channels, (1, n_channels), bias=False),
-            nn.BatchNorm2d(n_channels),
-            # Expression(safe_log),
-            nn.ELU(),
-            # 
-            nn.Conv2d(n_channels, n_filters_selected, kernel_size=1),
-            nn.BatchNorm2d(n_filters_selected),
-            nn.ELU(),
+            nn.Conv2d(n_filters_time, n_filters_spatial, (1, n_channels), bias=False),
+            nn.BatchNorm2d(n_filters_spatial),
+            Expression(cov),
+            Expression(safe_log),
             nn.Dropout(dropout),
         )
 
-        outlen = n_channels
+        n_filters_final = n_filters_spatial
         self.classifier = nn.Sequential(
-            nn.Conv2d(n_filters_selected, n_classes, (outlen, 1), bias=True),
+            nn.Conv2d(n_filters_final, n_classes, kernel_size=1),
             nn.LogSoftmax(dim=1)
         )
 
@@ -45,8 +41,8 @@ class CSPNet(nn.Module):
     def _reset_parameters(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.xavier_uniform_(m.weight, gain=1)
-                # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                # nn.init.xavier_uniform_(m.weight, gain=1)
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
