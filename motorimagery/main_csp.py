@@ -3,25 +3,57 @@
 import numpy as np
 from sklearn import svm
 from common.linear import *
-from motorimagery.eegreader import *
+from common.spatialfilter import *
+from motorimagery.mireader import *
 
 
+setname = 'bcicomp2005IVa'
+fs = 100
+n_classes = 2
+chanset = np.arange(118)
+# chanset = [
+#     np.arange(13,22),
+#     np.arange(32,39),
+#     np.arange(49,58),
+#     np.arange(67,76),
+#     np.arange(86,95),
+#     np.array([103, 105, 107, 111, 112, 113])
+#     ]
+# chanset = np.hstack(chanset)
+n_channels = len(chanset)
 datapath = 'E:/bcicompetition/bci2005/IVa/'
 subjects = ['aa', 'al', 'av', 'aw', 'ay']
 
-fs = 100
+"""
+setname = 'bcicomp2005IIIa'
+fs = 250
+n_classes = 4
+chanset = np.arange(60)
+n_channels = len(chanset)
+datapath = 'E:/bcicompetition/bci2005/IIIa/'
+subjects = ['k3', 'k6', 'l1']
+"""
+"""
+setname = 'bcicomp2008IIa'
+fs = 250
+n_classes = 4
+chanset = np.arange(22)
+n_channels = len(chanset)
+datapath = 'E:/bcicompetition/bci2008/IIa/'
+# datapath = '/Users/yuty2009/data/bcicompetition/bci2008/IIa/'
+subjects = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09']
+"""
+
 f1 = 7
 f2 = 30
-order = 5
-# fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='bandpass')
-fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
+order = 3
+fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='bandpass')
+# fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
 # show_filter(fb, fa, fs)
 
-timewin = [1.0, 4.0] # [0.5, 3.5] actually due to 0.5 s pre-task
+timewin = [1.0, 4.0] # 0.5s pre-task data
 sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
 n_timepoints = sampleseg[1] - sampleseg[0]
-
-chanset = np.arange(118)
 
 num_filters = 6
 
@@ -29,7 +61,7 @@ accTest = np.zeros(len(subjects))
 for ss in range(len(subjects)):
     subject = subjects[ss]
     print('Load EEG epochs for subject ' + subject)
-    dataTrain, targetTrain, dataTest, targetTest = load_dataset(datapath, subject)
+    dataTrain, targetTrain, dataTest, targetTest = load_eegdata(setname, datapath, subject)
     print('Extract CSP features from epochs for subject ' + subject)
     RsTrain, labelTrain = extract_variance(dataTrain, targetTrain, [fb, fa], sampleseg, chanset)
     RsTest, labelTest = extract_variance(dataTest, targetTest, [fb, fa], sampleseg, chanset)

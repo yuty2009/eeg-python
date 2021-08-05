@@ -238,13 +238,13 @@ def extract_variance_multiband(data, target, bands, sampleseg, chanset):
     num_channel_used = len(chanset)
 
     fs = 100
-    order = 5
+    order = 3
     num_bands = len(bands)
     Rss = []
     for k in range(num_bands):
         f1, f2 = bands[k]
-        # fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='bandpass')
-        fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
+        fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='bandpass')
+        # fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
         Rs = np.zeros([num_trials, num_channel_used, num_channel_used])
         for i in range(num_trials):
             signal_epoch = data[i]
