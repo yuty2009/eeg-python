@@ -6,7 +6,7 @@ from common.linear import *
 from common.bayesian.linear import *
 from common.spatialfilter import *
 from common.riemann.riemann import *
-from motorimagery.mireader import *
+from mireader import *
 
 
 setname = 'bcicomp2005IVa'
@@ -37,52 +37,55 @@ timewin = [1.0, 4.0] # 0.5s pre-task data
 sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
 n_timepoints = sampleseg[1] - sampleseg[0]
 
-num_filters = 6
+n_filters = 3
 
-accTest = np.zeros(len(subjects))
+test_accus = np.zeros(len(subjects))
 for ss in range(len(subjects)):
     subject = subjects[ss]
     print('Load EEG epochs for subject ' + subject)
     dataTrain, targetTrain, dataTest, targetTest = load_eegdata(setname, datapath, subject)
-    print('Extract CSP features from epochs for subject ' + subject)
-    RsTrain, labelTrain = extract_variance(dataTrain, targetTrain, [fb, fa], sampleseg, chanset)
-    RsTest, labelTest = extract_variance(dataTest, targetTest, [fb, fa], sampleseg, chanset)
-    num_train, num_channels = RsTrain.shape[0:2]
-    num_test = RsTest.shape[0]
+    print('Extract raw features from epochs for subject ' + subject)
+    featTrain, labelTrain = extract_rawfeature(dataTrain, targetTrain, sampleseg, chanset, [fb, fa])
+    featTest, labelTest = extract_rawfeature(dataTest, targetTest, sampleseg, chanset, [fb, fa])
+    n_train = featTrain.shape[0]
+    n_test = featTest.shape[0]
 
-    WCSP = trainCSP2(RsTrain, labelTrain, num_filters)
-
-    RcspTrain = np.zeros((num_train, num_filters, num_filters))
-    for i in range(num_train):
-        RcspTrain[i, :, :] = np.dot(np.dot(WCSP.T, RsTrain[i]), WCSP)
-    Cmean = riemannmean(RcspTrain)
-    X_train = tangentspace(RcspTrain, Cmean)
+    csp = CSP(n_filters)
+    wcsp = csp.fit(featTrain, labelTrain)
+    
+    covzTrain = np.zeros((n_train, 2*n_filters, 2*n_filters))
+    for i in range(n_train):
+        z_trial = csp.project(featTrain[i], wcsp)
+        covzTrain[i, :, :] = np.matmul(np.transpose(z_trial), z_trial)
+    rmean_z = riemannmean(covzTrain)
+    x_train = tangentspace(covzTrain, rmean_z)
     y_train = labelTrain
     y_train[np.argwhere(y_train == 2)] = -1
 
     # model = svm.SVC(kernel='linear')
     # model.fit(X_train, y_train)
     model = BayesARDLogisticRegression()
-    w, b = model.fit(X_train, y_train)
+    w, b = model.fit(x_train, y_train)
 
-    RcspTest = np.zeros((num_test, num_filters, num_filters))
-    for i in range(num_test):
-        RcspTest[i, :, :] = np.dot(np.dot(WCSP.T, RsTest[i]), WCSP)
-    X_test = tangentspace(RcspTest, Cmean)
+    covzTest = np.zeros((n_test, 2*n_filters, 2*n_filters))
+    for i in range(n_test):
+        z_trial = csp.project(featTest[i], wcsp)
+        covzTest[i, :, :] = np.matmul(np.transpose(z_trial), z_trial)
+    x_test = tangentspace(covzTest, rmean_z)
     y_test = labelTest
     y_test[np.argwhere(y_test == 2)] = -1
     
     # y_pred = model.predict(X_test)
-    y_pred, _ = model.predict(X_test)
+    y_pred, _ = model.predict(x_test)
 
-    accTest[ss] = np.mean(np.array(y_pred == y_test).astype(int))
+    test_accus[ss] = np.mean(np.array(y_pred == y_test).astype(int))
 
-print(np.mean(accTest))
+print(f'Overall accuracy: {np.mean(test_accus): .3f}')
 
 import matplotlib.pyplot as plt
-x = np.arange(len(accTest))
-plt.bar(x, accTest*100)
-plt.title('Accuracy for the five subjects')
+x = np.arange(len(test_accus))
+plt.bar(x, test_accus*100)
+plt.title('Averaged accuracy for all subjects')
 plt.xticks(x, subjects)
 plt.ylabel('Accuracy [%]')
 plt.grid(which='both', axis='both')

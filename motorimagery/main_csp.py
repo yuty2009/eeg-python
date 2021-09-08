@@ -44,64 +44,64 @@ datapath = 'E:/bcicompetition/bci2008/IIa/'
 subjects = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09']
 """
 
-f1 = 7
-f2 = 30
-order = 3
+order, f1, f2 = 3, 7, 30
 fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='bandpass')
-# fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
+# fb, fa = signal.cheby2(order, 30, [2*f1/fs, 2*f2/fs], btype='bandpass')
 # show_filter(fb, fa, fs)
 
 timewin = [1.0, 4.0] # 0.5s pre-task data
 sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
 n_timepoints = sampleseg[1] - sampleseg[0]
 
-num_filters = 6
+n_filters = 3
 
-accTest = np.zeros(len(subjects))
+train_accu = np.zeros(len(subjects))
+test_accu = np.zeros(len(subjects))
 for ss in range(len(subjects)):
     subject = subjects[ss]
     print('Load EEG epochs for subject ' + subject)
     dataTrain, targetTrain, dataTest, targetTest = load_eegdata(setname, datapath, subject)
-    print('Extract CSP features from epochs for subject ' + subject)
-    RsTrain, labelTrain = extract_variance(dataTrain, targetTrain, [fb, fa], sampleseg, chanset)
-    RsTest, labelTest = extract_variance(dataTest, targetTest, [fb, fa], sampleseg, chanset)
-    num_train, num_channels = RsTrain.shape[0:2]
-    num_test = RsTest.shape[0]
+    print('Extract raw features from epochs for subject ' + subject)
+    featTrain, labelTrain = extract_rawfeature(dataTrain, targetTrain, sampleseg, chanset, [fb, fa])
+    featTest, labelTest = extract_rawfeature(dataTest, targetTest, sampleseg, chanset, [fb, fa])
+    n_train = featTrain.shape[0]
+    n_test = featTest.shape[0]
 
-    WCSP = trainCSP2(RsTrain, labelTrain, num_filters)
-
-    X_train = np.zeros([num_train, num_filters])
-    for i in range(num_train):
-        temp = np.abs(np.diag(np.dot(np.dot(WCSP.T, RsTrain[i]), WCSP)))
-        temp = np.log(temp / np.sum(temp))
-        X_train[i, :] = temp
+    csp = CSP(n_filters)
+    wcsp = csp.fit(featTrain, labelTrain)
+    x_train = np.zeros([n_train, 2*n_filters])
+    for i in range(n_train):
+        x_train[i] = csp.transform(featTrain[i], wcsp)
     y_train = labelTrain
     y_train[np.argwhere(y_train == 2)] = -1
 
     model = svm.SVC(kernel='linear')
-    model.fit(X_train, y_train)
+    model.fit(x_train, y_train)
     # model = LogisticRegression()
     # w, b = model.fit(X_train, y_train)
 
-    X_test = np.zeros([num_test, num_filters])
-    for i in range(num_test):
-        temp = np.abs(np.diag(np.dot(np.dot(WCSP.T, RsTest[i]), WCSP)))
-        temp = np.log(temp / np.sum(temp))
-        X_test[i, :] = temp
+    y_pred_train = model.predict(x_train)
+    train_accu[ss] = np.mean(np.array(y_pred_train == y_train).astype(int))
+
+    x_test = np.zeros([n_test, 2*n_filters])
+    for i in range(n_test):
+        x_test[i] = csp.transform(featTest[i], wcsp)
     y_test = labelTest
     y_test[np.argwhere(y_test == 2)] = -1
 
-    y_pred = model.predict(X_test)
+    y_pred = model.predict(x_test)
     # y_pred, _ = model.predict(X_test)
 
-    accTest[ss] = np.mean(np.array(y_pred == y_test).astype(int))
+    test_accu[ss] = np.mean(np.array(y_pred == y_test).astype(int))
 
-print(np.mean(accTest))
+    print(f'Subject {subject} train_accu: {train_accu[ss]: .3f}, test_accu: {test_accu[ss]: .3f}')
+
+print(f'Overall accuracy: {np.mean(test_accu): .3f}')
 
 import matplotlib.pyplot as plt
-x = np.arange(len(accTest))
-plt.bar(x, accTest*100)
-plt.title('Accuracy for the five subjects')
+x = np.arange(len(test_accu))
+plt.bar(x, test_accu*100)
+plt.title('Averaged accuracy for all subjects')
 plt.xticks(x, subjects)
 plt.ylabel('Accuracy [%]')
 plt.grid(which='both', axis='both')

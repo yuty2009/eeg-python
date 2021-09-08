@@ -9,9 +9,7 @@ from common.torchutils import RememberBest
 from common.stopcriteria import Or, MaxEpochs, NoIncrease, ColumnBelow
 from common.torchutils import train_epoch, evaluate
 from mireader import *
-from convnet import CSPNet, EEGNet, ShallowConvNet, DeepConvNet
-from fbcnet import deepConvNet, eegNet
-from transformer import EEGTransformer
+from fbcnet import FBCNet
 
 
 """
@@ -51,21 +49,20 @@ datapath = 'E:/bcicompetition/bci2008/IIa/'
 # datapath = '/Users/yuty2009/data/bcicompetition/bci2008/IIa/'
 subjects = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09']
 
+order, fstart, fstop, fstep, ftrans = 4, 4, 40, 4, 2
+f1s = np.arange(fstart, fstop, fstep)
+f2s = np.arange(fstart+fstep, fstop+fstep, fstep)
+fbanks = np.hstack((f1s[:,None], f2s[:,None]))
+# fbanks = [[7, 30], [30, 40]]
+n_fbanks = len(fbanks)
 
-order, f1, f2, ftrans = 4, 2.1, 48, 2
-fpass = [f1*2.0/fs, f2*2.0/fs]
-fstop =  [(f1-ftrans)*2.0/fs, (f2+ftrans)*2.0/fs]
-# fb, fa = signal.butter(order, fpass, btype='bandpass')
-fb, fa = signal.cheby2(order, 30, fstop, btype='bandpass')
-# show_filter(fb, fa, fs)
-
-timewin = [0.5, 4.5] # 0.5 s pre-task data
+timewin = [0.5, 4.5] # 0.5s pre-task data
 sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
 n_timepoints = sampleseg[1] - sampleseg[0]
 
 tf_tensor = ToTensor()
 
-torch.manual_seed(7)
+torch.manual_seed(20190821)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 outpath = os.path.join(datapath, 'output')
@@ -87,20 +84,35 @@ for ss in range(len(subjects)):
     subject = subjects[ss]
     print('Load EEG epochs for subject ' + subject)
     dataTrain, targetTrain, dataTest, targetTest = load_eegdata(setname, datapath, subject)
-    print('Extract raw features from epochs for subject ' + subject)
-    featTrain, labelTrain = extract_rawfeature(dataTrain, targetTrain, sampleseg, chanset, [fb, fa])
-    featTest, labelTest = extract_rawfeature(dataTest, targetTest, sampleseg, chanset, [fb, fa])
-    trainset_full = EEGDataset(featTrain, labelTrain, tf_tensor)
-    testset = EEGDataset(featTest, labelTest, tf_tensor)
+    print('Extract multi-band features from epochs for subject ' + subject)
+    featTrain_bands = []
+    featTest_bands = []
+    for k in range(n_fbanks):
+        f1, f2 = fbanks[k]
+        fpass = [f1*2.0/fs, f2*2.0/fs]
+        fstop =  [(f1-ftrans)*2.0/fs, (f2+ftrans)*2.0/fs]
+        # fb, fa = signal.butter(order, fpass, btype='bandpass')
+        fb, fa = signal.cheby2(order, 30, fstop, btype='bandpass')
+        featTrain, labelTrain = extract_rawfeature(dataTrain, targetTrain, sampleseg, chanset, [fb, fa])
+        featTest, labelTest = extract_rawfeature(dataTest, targetTest, sampleseg, chanset, [fb, fa])
+        featTrain_bands.append(featTrain)
+        featTest_bands.append(featTest)
+    featTrain_bands = np.transpose(np.stack(featTrain_bands, axis=0), [1, 2, 3, 0]) # (n, t, c, b)
+    featTest_bands = np.transpose(np.stack(featTest_bands, axis=0), [1, 2, 3, 0])
+    n_train = featTrain.shape[1]
+    n_test = featTest.shape[1]
+
+    trainset_full = EEGDataset(featTrain_bands, labelTrain, tf_tensor)
+    testset = EEGDataset(featTest_bands, labelTest, tf_tensor)
 
     valid_set_fraction = 0.2
     valid_set_size = int(len(trainset_full) * valid_set_fraction)
     train_set_size = len(trainset_full) - valid_set_size
-    # trainset, validset = random_split(trainset_full, [train_set_size, valid_set_size])
-    trainset = Subset(trainset_full, list(range(0, train_set_size)))
-    validset = Subset(trainset_full, list(range(train_set_size, len(trainset_full))))
+    trainset, validset = random_split(trainset_full, [train_set_size, valid_set_size])
+    # trainset = Subset(trainset_full, list(range(0, train_set_size)))
+    # validset = Subset(trainset_full, list(range(train_set_size, len(trainset_full))))
 
-    model = CSPNet(n_timepoints, n_channels, n_classes).to(device)
+    model = FBCNet(n_timepoints, n_channels, n_classes, n_fbanks).to(device)
     criterion = torch.nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters())
 
@@ -124,7 +136,7 @@ for ss in range(len(subjects)):
         train_accu, train_loss = train_epoch(
             model, trainset, criterion=criterion, optimizer=optimizer,
             batch_size=batch_size, device=device)
-        valid_accu, valid_loss  = evaluate(model, validset, criterion=criterion, batch_size=batch_size, device=device)
+        valid_accu, valid_loss = evaluate(model, validset, criterion=criterion, batch_size=batch_size, device=device)
         
         epochs_df = epochs_df.append({
             'train_accu': train_accu, 'train_loss': train_loss,
@@ -152,7 +164,7 @@ for ss in range(len(subjects)):
                         ]
                     )
 
-        test_accu, test_loss  = evaluate(model, testset, criterion=criterion, batch_size=batch_size, device=device)
+        test_accu, test_loss = evaluate(model, testset, criterion=criterion, batch_size=batch_size, device=device)
         
         print((f"Epoch: {epoch}, "
                f"Train accu: {train_accu:.3f}, loss: {train_loss:.3f}, "
@@ -160,7 +172,7 @@ for ss in range(len(subjects)):
                f"Test accu:  {test_accu:.3f},  loss: {test_loss:.3f}, "
                f"Epoch time = {time.time() - start_time: .3f} s"))
 
-    test_accus[ss] = test_accu
+        test_accus[ss] = test_accu
 
 print(f'Overall accuracy: {np.mean(test_accus): .3f}')
 

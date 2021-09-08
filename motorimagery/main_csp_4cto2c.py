@@ -39,13 +39,13 @@ timewin = [1.0, 4.0] # 0.5s pre-task data
 sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
 n_timepoints = sampleseg[1] - sampleseg[0]
 
-num_filters = 6
+n_filters = 3
 
-num_classes = 4
-tasks = list(itertools.combinations(np.arange(1, num_classes+1), 2))
-num_tasks = len(tasks)
+n_classes = 4
+tasks = list(itertools.combinations(np.arange(1, n_classes+1), 2))
+n_tasks = len(tasks)
 
-accTest = np.zeros((len(subjects), num_tasks))
+accTest = np.zeros((len(subjects), n_tasks))
 for ss in range(len(subjects)):
     subject = subjects[ss]
     print('Load EEG epochs for subject ' + subject)
@@ -59,37 +59,33 @@ for ss in range(len(subjects)):
         dataTest1 = dataTest[indexTest1.ravel(),:,:]
         targetTrain1 = targetTrain[indexTrain1.ravel()]
         targetTest1 = targetTest[indexTest1.ravel()]
-        RsTrain, labelTrain = extract_variance(dataTrain1, targetTrain1, [fb, fa], sampleseg, chanset)
-        RsTest, labelTest = extract_variance(dataTest1, targetTest1, [fb, fa], sampleseg, chanset)
-        num_train, num_channels = RsTrain.shape[0:2]
-        num_test = RsTest.shape[0]
+        fTrain, lTrain = extract_rawfeature(dataTrain1, targetTrain1, sampleseg, chanset, [fb, fa])
+        fTest, lTest = extract_rawfeature(dataTest1, targetTest1, sampleseg, chanset, [fb, fa])
+        n_train = fTrain.shape[0]
+        n_test = fTest.shape[0]
 
-        WCSP = trainCSP2(RsTrain, labelTrain, num_filters)
-
-        X_train = np.zeros([num_train, num_filters])
-        for i in range(num_train):
-            temp = np.abs(np.diag(np.dot(np.dot(WCSP.T, RsTrain[i]), WCSP)))
-            temp = np.log(temp / np.sum(temp))
-            X_train[i, :] = temp
-        y_train = labelTrain
+        csp = CSP(n_filters)
+        wcsp = csp.fit(fTrain, lTrain)
+        x_train = np.zeros([n_train, 2*n_filters])
+        for i in range(n_train):
+            x_train[i] = csp.transform(fTrain[i], wcsp)
+        y_train = lTrain
         y_train[np.argwhere(y_train == labels[0])] = 1
         y_train[np.argwhere(y_train == labels[1])] = -1
 
         model = svm.SVC(kernel='linear')
-        model.fit(X_train, y_train)
+        model.fit(x_train, y_train)
         # model = LogisticRegression()
         # w, b = model.fit(X_train, y_train)
 
-        X_test = np.zeros([num_test, num_filters])
-        for i in range(num_test):
-            temp = np.abs(np.diag(np.dot(np.dot(WCSP.T, RsTest[i]), WCSP)))
-            temp = np.log(temp / np.sum(temp))
-            X_test[i, :] = temp
-        y_test = labelTest
+        x_test = np.zeros([n_test, 2*n_filters])
+        for i in range(n_test):
+            x_test[i] = csp.transform(fTest[i], wcsp)
+        y_test = lTest
         y_test[np.argwhere(y_test == labels[0])] = 1
         y_test[np.argwhere(y_test == labels[1])] = -1
 
-        y_predict = model.predict(X_test)
+        y_predict = model.predict(x_test)
 
         accTest[ss, tt] = np.mean(np.array(np.sign(y_predict) == y_test).astype(int))
 
@@ -98,7 +94,7 @@ print(np.mean(accTest))
 import matplotlib.pyplot as plt
 x = np.arange(len(accTest))
 plt.bar(x, np.mean(accTest, 1)*100)
-plt.title('Accuracy for the five subjects')
+plt.title('Averaged accuracy for all subjects')
 plt.xticks(x, subjects)
 plt.ylabel('Accuracy [%]')
 plt.grid(which='both', axis='both')

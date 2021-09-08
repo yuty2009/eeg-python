@@ -1,8 +1,10 @@
 # -*- coding:utf-8 -*-
 
 import numpy as np
+from sklearn import svm
 from common.linear import *
 from common.spatialfilter import *
+from common import datawrapper as ds
 from motorimagery.mireader import *
 
 
@@ -43,7 +45,7 @@ datapath = 'E:/bcicompetition/bci2008/IIa/'
 # datapath = '/Users/yuty2009/data/bcicompetition/bci2008/IIa/'
 subjects = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09']
 
-order, fstart, fstop, fstep, ftrans = 4, 4, 40, 4, 2
+order, fstart, fstop, fstep, = 3, 4, 40, 4
 f1s = np.arange(fstart, fstop, fstep)
 f2s = np.arange(fstart+fstep, fstop+fstep, fstep)
 fbanks = np.hstack((f1s[:,None], f2s[:,None]))
@@ -56,8 +58,10 @@ n_timepoints = sampleseg[1] - sampleseg[0]
 
 n_filters = 3
 
-train_accus = np.zeros(len(subjects))
-test_accus = np.zeros(len(subjects))
+n_times = 1
+n_folds = 10
+train_accus = np.zeros([len(subjects), n_times, n_folds])
+test_accus = np.zeros([len(subjects), n_times, n_folds])
 for ss in range(len(subjects)):
     subject = subjects[ss]
     print('Load EEG epochs for subject ' + subject)
@@ -67,10 +71,8 @@ for ss in range(len(subjects)):
     featTest_bands = []
     for k in range(n_fbanks):
         f1, f2 = fbanks[k]
-        fpass = [f1*2.0/fs, f2*2.0/fs]
-        fstop =  [(f1-ftrans)*2.0/fs, (f2+ftrans)*2.0/fs]
-        # fb, fa = signal.butter(order, fpass, btype='bandpass')
-        fb, fa = signal.cheby2(order, 30, fstop, btype='bandpass')
+        fb, fa = signal.butter(order, [2*f1/fs, 2*f2/fs], btype='bandpass')
+        # fb, fa = signal.cheby2(order, 30, [2*f1/fs, 2*f2/fs], btype='bandpass')
         featTrain, labelTrain = extract_rawfeature(dataTrain, targetTrain, sampleseg, chanset, [fb, fa])
         featTest, labelTest = extract_rawfeature(dataTest, targetTest, sampleseg, chanset, [fb, fa])
         featTrain_bands.append(featTrain)
@@ -80,32 +82,44 @@ for ss in range(len(subjects)):
     n_train = featTrain.shape[1]
     n_test = featTest.shape[1]
 
-    fbcsp = FBCSP(n_filters)
-    wfbcsp = fbcsp.fit(featTrain_bands, labelTrain)
+    for t in range(n_times):
+        np.random.seed(t)
+        ds_train = ds.Dataset(featTrain_bands, labelTrain)
+        ds_train.set_num_folds(n_folds)
+        for fold in range(n_folds):
+            '''for N times x K fold CV'''
+            feaTrain_fold, labelTrain_fold, featTest_fold, labelTest_fold = ds_train.next_fold()
 
-    x_train = fbcsp.transform(featTrain_bands, wfbcsp)
-    y_train = labelTrain - 1 # 
+            fbcsp = FBCSP(n_filters)
+            wfbcsp = fbcsp.fit(feaTrain_fold, labelTrain_fold)
 
-    model = SoftmaxClassifier()
-    model.fit(x_train, y_train)
+            x_train = fbcsp.transform(feaTrain_fold, wfbcsp)
+            y_train = labelTrain_fold - 1 # 
 
-    y_pred_train, _ = model.predict(x_train)
-    train_accus[ss] = np.mean(np.array(y_pred_train == y_train).astype(int))
+            model = SoftmaxClassifier()
+            model.fit(x_train, y_train)
 
-    x_test = fbcsp.transform(featTest_bands, wfbcsp)
-    y_test = labelTest - 1
+            y_pred_train, _ = model.predict(x_train)
+            train_accus[ss] = np.mean(np.array(y_pred_train == y_train).astype(int))
 
-    # y_pred = model.predict(x_test)
-    y_pred, _ = model.predict(x_test)
-    test_accus[ss] = np.mean(np.array(y_pred == y_test).astype(int))
+            x_test = fbcsp.transform(featTest_fold, wfbcsp)
+            y_test = labelTest_fold - 1
 
-    print(f'Subject {subject} train_accu: {train_accus[ss]: .3f}, test_accu: {test_accus[ss]: .3f}')
+            # y_pred = model.predict(x_test)
+            y_pred, _ = model.predict(x_test)
+            test_accus[ss, t, fold] = np.mean(np.array(y_pred == y_test).astype(int))
+
+    train_accu_cv = np.mean(train_accus[ss])
+    test_accu_cv = np.mean(test_accus[ss])
+    print(f'Subject {subject} train_accu: {train_accu_cv: .3f}, test_accu: {test_accu_cv: .3f}')
 
 print(f'Overall accuracy: {np.mean(test_accus): .3f}')
 
+test_accu_ss = np.mean(np.mean(test_accus, axis=-1),axis=-1)
+
 import matplotlib.pyplot as plt
-x = np.arange(len(test_accus))
-plt.bar(x, test_accus*100)
+x = np.arange(len(test_accu_ss))
+plt.bar(x, test_accu_ss*100)
 plt.title('Averaged accuracy for all subjects')
 plt.xticks(x, subjects)
 plt.ylabel('Accuracy [%]')

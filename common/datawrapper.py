@@ -28,18 +28,19 @@ def read_cntdata(filepath):
 
 def read_gdfdata(filepath):
     import mne
-    f = mne.io.read_raw_gdf(filepath)
-    clabs = f.ch_names
-    event_array, event_id = mne.events_from_annotations(f)
-    event_value = {v: int(k) for k, v in event_id.items()}
+    raw_gdf = mne.io.read_raw_gdf(filepath, stim_channel='auto')
+    clabs = raw_gdf.ch_names
+    gdf_events, name_to_code = mne.events_from_annotations(raw_gdf)
+    code_to_name = {v: int(k) for k, v in name_to_code.items()}
     events = dict()
-    events['pos'] = event_array[:, 0]
-    events['type'] = np.array([event_value[e] for e in event_array[:, 2]])
-    data, times = f[:, :]
+    events['pos'] = gdf_events[:, 0]
+    events['type'] = np.array([code_to_name[e] for e in gdf_events[:, 2]])
+    raw_gdf.load_data()
+    data = raw_gdf.get_data()
     return np.transpose(data), events, clabs
 
 
-class Dataset(object):
+class Dataset:
     def __init__(self, features, labels):
         self._features = features
         self._labels = labels

@@ -1,16 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import os
 import torch
 from torch.utils.data import Dataset
 from common.datawrapper import read_matdata, read_gdfdata
 from common.signalproc import *
-
-
-# translate epoch data (n, t, c) into grayscale images (n, 1, t, c)
-class TransformEpoch(object):
-    def __call__(self, epoch):
-        epoch = torch.Tensor(epoch)
-        return torch.unsqueeze(epoch, dim=0)
 
 
 class EEGDataset(Dataset):
@@ -73,7 +67,7 @@ def load_eegdata_bcicomp2005IVa(filepath, labelpath):
     num_samples = sampleseg[1] - sampleseg[0]
     num_channels = cnt.shape[1]
 
-    targetTrain = np.zeros(num_train)
+    targetTrain = np.zeros(num_train, dtype=np.int)
     dataTrain = np.zeros([num_train, num_samples, num_channels])
     for i in range(num_train):
         begin = pos[i]
@@ -81,7 +75,7 @@ def load_eegdata_bcicomp2005IVa(filepath, labelpath):
         dataTrain[i,:,:] = cnt[begin:end,:]
         targetTrain[i] = code[i]
 
-    targetTest = np.zeros(num_test)
+    targetTest = np.zeros(num_test, dtype=np.int)
     dataTest = np.zeros([num_test, num_samples, num_channels])
     for i in range(num_test):
         begin = pos[num_train+i]
@@ -93,7 +87,6 @@ def load_eegdata_bcicomp2005IVa(filepath, labelpath):
 
 
 def load_eegdata_bcicomp2005IIIa(filepath, labelpath):
-    import os
     label_key = os.path.basename(labelpath)
     label_key = label_key[:-4]
     labeldata = read_matdata(labelpath, [label_key])
@@ -145,11 +138,12 @@ def load_eegdata_bcicomp2005IIIa(filepath, labelpath):
 
 
 def load_eegdata_bcicomp2008IIa(fdatatrain, flabeltrain, fdatatest, flabeltest):
+    startcode = 768 # trial start event code
     s, events, clabs = read_gdfdata(fdatatrain)
     s = 1e6 * s # convert to millvolt for numerical stability
     pos = events['pos']
     code = events['type']
-    indices = np.argwhere(code == 768)
+    indices = np.argwhere(code == startcode) # 768
 
     num_train = len(indices)
     fs = 250
@@ -169,7 +163,7 @@ def load_eegdata_bcicomp2008IIa(fdatatrain, flabeltrain, fdatatest, flabeltest):
     s = 1e6 * s # convert to millvolt for numerical stability
     pos = events['pos']
     code = events['type']
-    indices = np.argwhere(code == 768)
+    indices = np.argwhere(code == startcode) # 768
 
     num_test = len(indices)
     dataTest = np.zeros([num_test, num_samples, num_channels])
@@ -183,7 +177,7 @@ def load_eegdata_bcicomp2008IIa(fdatatrain, flabeltrain, fdatatest, flabeltest):
     return dataTrain, targetTrain, dataTest, targetTest
 
 
-def extract_rawfeature(data, target, filter, sampleseg, chanset, standardize=True):
+def extract_rawfeature(data, target, sampleseg, chanset, filter=None, standardize=False):
     num_trials, num_samples, num_channels = data.shape
     sample_begin = sampleseg[0]
     sample_end = sampleseg[1]
@@ -195,24 +189,22 @@ def extract_rawfeature(data, target, filter, sampleseg, chanset, standardize=Tru
     labels = target
     features = np.zeros([num_trials, num_samples_used, num_channel_used])
     for i in range(num_trials):
-        signal_epoch = data[i]
-        signal_filtered = signal_epoch
-        for j in range(num_channels):
-            signal_filtered[:, j] = signal.lfilter(filter[0], filter[1], signal_filtered[:, j])
-            # signal_filtered[:, j] = signal.filtfilt(filter[0], filter[1], signal_filtered[:, j])
+        signal_filtered = data[i]
+        if filter is not None:
+            signal_filtered = signal.lfilter(filter[0], filter[1], signal_filtered, axis=0)
+            # signal_filtered = signal.filtfilt(filter[0], filter[1], signal_epoch, axis=0)
         if standardize:
-            # init_block_size=1000 this param setting has a big impact on the result
+            # init_block_size = 1000 this param setting has a big impact on the result
             signal_filtered = exponential_running_standardize(signal_filtered, init_block_size=1000)
         features[i] = signal_filtered[sample_begin:sample_end, chanset]
 
     return features, labels
 
 
-def extract_variance(data, target, filter, sampleseg, chanset):
+def extract_variance(data, target, sampleseg, chanset, filter=None):
     num_trials, num_samples, num_channels = data.shape
     sample_begin = sampleseg[0]
     sample_end = sampleseg[1]
-    num_samples_used = sample_end - sample_begin
     num_channel_used = len(chanset)
 
     # show_filtering_result(filter[0], filter[1], data[0,:,0])
@@ -220,12 +212,13 @@ def extract_variance(data, target, filter, sampleseg, chanset):
     labels = target
     Rs = np.zeros([num_trials, num_channel_used, num_channel_used])
     for i in range(num_trials):
-        signal_epoch = data[i]
-        signal_filtered = signal_epoch
-        for j in range(num_channels):
-            signal_filtered[:, j] = signal.filtfilt(filter[0], filter[1], signal_filtered[:, j])
+        signal_filtered = data[i]
+        if filter is not None:
+            signal_filtered = signal.lfilter(filter[0], filter[1], signal_filtered, axis=0)
+            # signal_filtered = signal.filtfilt(filter[0], filter[1], signal_epoch, axis=0)
         signal_filtered = signal_filtered[sample_begin:sample_end, chanset]
-        Rs[i] = np.dot(signal_filtered.T, signal_filtered)/np.trace(np.dot(signal_filtered.T, signal_filtered))
+        cov_tmp = np.dot(signal_filtered.T, signal_filtered)
+        Rs[i] = cov_tmp/np.trace(cov_tmp)
 
     return Rs, labels
 
@@ -234,7 +227,6 @@ def extract_variance_multiband(data, target, bands, sampleseg, chanset):
     num_trials, num_samples, num_channels = data.shape
     sample_begin = sampleseg[0]
     sample_end = sampleseg[1]
-    num_samples_used = sample_end - sample_begin
     num_channel_used = len(chanset)
 
     fs = 100
@@ -247,12 +239,12 @@ def extract_variance_multiband(data, target, bands, sampleseg, chanset):
         # fb, fa = signal.cheby2(order, 40, [2*f1/fs, 2*f2/fs], btype='bandpass')
         Rs = np.zeros([num_trials, num_channel_used, num_channel_used])
         for i in range(num_trials):
-            signal_epoch = data[i]
-            signal_filtered = signal_epoch
-            for j in range(num_channels):
-                signal_filtered[:, j] = signal.filtfilt(fb, fa, signal_filtered[:, j])
+            signal_filtered = data[i]
+            signal_filtered = signal.lfilter(filter[0], filter[1], signal_filtered, axis=0)
+            # signal_filtered = signal.filtfilt(filter[0], filter[1], signal_epoch, axis=0)
             signal_filtered = signal_filtered[sample_begin:sample_end, chanset]
-            Rs[i] = np.dot(signal_filtered.T, signal_filtered)/np.trace(np.dot(signal_filtered.T, signal_filtered))
+            cov_tmp = np.dot(signal_filtered.T, signal_filtered)
+            Rs[i] = cov_tmp/np.trace(cov_tmp)
         Rss.append(Rs)
 
     labels = target
@@ -267,8 +259,12 @@ def load_dataset_preprocessed(datapath, subject):
 
 if __name__ == '__main__':
 
-    datapath = 'E:/bcicompetition/bci2005/IVa/'
-    subjects = ['aa', 'al', 'av', 'aw', 'ay']
+    # setname = 'bcicomp2005IVa'
+    # datapath = 'E:/bcicompetition/bci2005/IVa/'
+    # subjects = ['aa', 'al', 'av', 'aw', 'ay']
+    setname = 'bcicomp2008IIa'
+    datapath = 'E:/bcicompetition/bci2008/IIa/'
+    subjects = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09']
 
     import os
     if not os.path.isdir(datapath + 'processed/'):
@@ -276,11 +272,9 @@ if __name__ == '__main__':
 
     for ss in range(len(subjects)):
         subject = subjects[ss]
-        filepath = datapath+'data_set_IVa_'+subject+'.mat'
-        labelpath = datapath+'true_labels_'+subject+'.mat'
 
         print('Load and extract continuous EEG into epochs for subject '+subject)
-        dataTrain, targetTrain, dataTest, targetTest = load_eegdata_bcicomp2005IVa(filepath, labelpath)
+        dataTrain, targetTrain, dataTest, targetTest = load_eegdata(setname, datapath, subject)
 
         np.savez(datapath+'processed/'+subject+'.npz',
                  dataTrain=dataTrain, targetTrain=targetTrain, dataTest=dataTest, targetTest=targetTest)
