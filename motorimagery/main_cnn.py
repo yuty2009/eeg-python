@@ -10,7 +10,6 @@ from common.stopcriteria import Or, MaxEpochs, NoIncrease, ColumnBelow
 from common.torchutils import train_epoch, evaluate
 from mireader import *
 from convnet import CSPNet, EEGNet, ShallowConvNet, DeepConvNet
-from fbcnet import deepConvNet, eegNet
 from transformer import EEGTransformer
 
 
@@ -52,7 +51,7 @@ datapath = 'E:/bcicompetition/bci2008/IIa/'
 subjects = ['A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09']
 
 
-order, f1, f2, ftrans = 4, 2.1, 48, 2
+order, f1, f2, ftrans = 4, 2.1, 38, 2
 fpass = [f1*2.0/fs, f2*2.0/fs]
 fstop =  [(f1-ftrans)*2.0/fs, (f2+ftrans)*2.0/fs]
 # fb, fa = signal.butter(order, fpass, btype='bandpass')
@@ -63,7 +62,7 @@ timewin = [0.5, 4.5] # 0.5 s pre-task data
 sampleseg = [int(fs*timewin[0]), int(fs*timewin[1])]
 n_timepoints = sampleseg[1] - sampleseg[0]
 
-tf_tensor = ToTensor()
+tf_eeg = Compose((ToTensor(), RandomTemporalShift()))
 
 torch.manual_seed(7)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -90,8 +89,8 @@ for ss in range(len(subjects)):
     print('Extract raw features from epochs for subject ' + subject)
     featTrain, labelTrain = extract_rawfeature(dataTrain, targetTrain, sampleseg, chanset, [fb, fa])
     featTest, labelTest = extract_rawfeature(dataTest, targetTest, sampleseg, chanset, [fb, fa])
-    trainset_full = EEGDataset(featTrain, labelTrain, tf_tensor)
-    testset = EEGDataset(featTest, labelTest, tf_tensor)
+    trainset_full = EEGDataset(featTrain, labelTrain, tf_eeg)
+    testset = EEGDataset(featTest, labelTest, tf_eeg)
 
     valid_set_fraction = 0.2
     valid_set_size = int(len(trainset_full) * valid_set_fraction)

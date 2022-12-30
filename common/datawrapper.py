@@ -19,11 +19,17 @@ def read_matdata(filepath, keys=None):
 
 def read_cntdata(filepath):
     import mne
-    f = mne.io.read_raw_cnt(filepath, montage=None)
-    clabs = f.ch_names
-    events = mne.find_events(f, stim_channel=None)
-    data, times = f[:, :]
-    return data, events, clabs
+    raw_cnt = mne.io.read_raw_cnt(filepath)
+    clabs = raw_cnt.ch_names
+    # events = mne.find_events(raw_cnt, stim_channel=None)
+    cnt_events, name_to_code = mne.events_from_annotations(raw_cnt)
+    code_to_name = {v: int(k) for k, v in name_to_code.items()}
+    events = dict()
+    events['pos'] = cnt_events[:, 0]
+    events['type'] = np.array([code_to_name[e] for e in cnt_events[:, 2]])
+    raw_cnt.load_data()
+    data = raw_cnt.get_data()
+    return np.transpose(data), events, clabs
 
 
 def read_gdfdata(filepath):

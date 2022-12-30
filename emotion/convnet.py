@@ -13,7 +13,7 @@ class CSPNet(nn.Module):
     def __init__(
         self, n_timepoints, n_channels, n_classes, dropout = 0.5,
         n_filters_t = 20, filter_size_t = 25,
-        n_filters_s = 2, filter_size_s = -1,
+        n_filters_s = 6, filter_size_s = -1,
         pool_size_1 = 100, pool_stride_1 = 25,
     ):
         super().__init__()

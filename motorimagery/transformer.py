@@ -3,23 +3,26 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from common.attention import MultiheadAttention
-from common.torchutils import Expression, DepthwiseConv2d, cov, safe_log
+from common.torchutils import Expression, safe_log, square, log_cov
+from common.torchutils import DepthwiseConv2d, SeparableConv2d, Conv2dNormWeight
 
 
 class EEGTransformer(nn.Module):
     def __init__(self, n_timepoints, n_channels, n_classes, dropout = 0.1,
-                 n_filters_time = 16, filter_size_time = 25, n_filters_spatial = -1,
-                 nhead = 8, num_layers = 2, ffn_dim = 512,):
+                 n_filters_t = 20, filter_size_t = 25,
+                 n_filters_s = 2, filter_size_s = -1,
+                 pool_size_1 = 100, pool_stride_1 = 25,
+                 nhead = 8, num_layers = 2, ffn_dim = 64):
         super().__init__()
-        assert filter_size_time <= n_timepoints, "Temporal filter size error"
-        if n_filters_spatial <= 0: n_filters_spatial = n_channels
+        assert filter_size_t <= n_timepoints, "Temporal filter size error"
+        if filter_size_s <= 0: filter_size_s = n_channels
         d_model = n_timepoints
         # temporal filtering
         self.feature_pre = nn.Sequential(
-            nn.Conv2d(1, n_filters_time, (filter_size_time, 1), padding='same', bias=False),
-            nn.BatchNorm2d(n_filters_time),
+            nn.Conv2d(1, n_filters_t, (filter_size_t, 1), padding=(filter_size_t//2, 0), bias=False),
+            nn.BatchNorm2d(n_filters_t),
         )
-        n_patches = n_filters_time * n_channels
+        n_patches = n_filters_t * n_channels
         # positional encoding
         self.pos_embedding = nn.Parameter(torch.randn(1, n_patches, d_model))
         self.pos_drop = nn.Dropout(dropout)
@@ -31,15 +34,19 @@ class EEGTransformer(nn.Module):
             dim_feedforward = ffn_dim,
             batch_first = True,
         )
-        # spatial filtering & calculate covariance
+        # spatial filtering
         self.feature_post = nn.Sequential(
-            DepthwiseConv2d(n_filters_time, n_filters_spatial, (1, n_channels), bias=False),
-            nn.BatchNorm2d(n_filters_time*n_filters_spatial),
-            Expression(cov),
+            nn.Conv2d(
+                n_filters_t, n_filters_t*n_filters_s, (1, filter_size_s), 
+                groups=n_filters_t, bias=False
+            ),
+            nn.BatchNorm2d(n_filters_t*n_filters_s),
+            Expression(square),
+            nn.AvgPool2d((pool_size_1, 1), stride=(pool_stride_1, 1)),
             Expression(safe_log),
-            nn.Dropout(dropout),
+            nn.Dropout(dropout), 
         )
-        n_features = n_filters_time * n_filters_spatial
+        n_features = n_filters_t * n_filters_s
         # classfier
         self.classifier = nn.Sequential(
             nn.Conv2d(n_features, n_classes, kernel_size=1),

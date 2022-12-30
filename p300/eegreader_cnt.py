@@ -14,13 +14,13 @@ def load_eegdata(filepath, filter):
 def extract_eegdata(eegdata, events, filter):
     fs = 250
     num_samples = int(0.6 * fs)
-    num_channels = eegdata.shape[0]
+    num_channels = eegdata.shape[1]
 
     fb, fa = filter
     # show_filtering_result(fb, fa, signal[0,:,0])
 
-    eventpos = events[:, 0]
-    eventtype = events[:, 2]
+    eventpos = events['pos']
+    eventtype = events['type']
     cuepos = np.logical_and(eventtype >= 41, eventtype <= 80).nonzero()[0]
     num_trials = len(cuepos) - 1 # The last character may not be complete.
     num_chars = len(np.unique(eventtype[cuepos[0]+1:cuepos[1]]))
@@ -37,8 +37,8 @@ def extract_eegdata(eegdata, events, filter):
                 event = eventtype[kk]
                 if event > 0 and event <= num_chars:
                     repeat[event - 1] += 1
-                    signal_epoch = eegdata[:, eventpos[kk]:eventpos[kk]+num_samples]
-                    data[i, repeat[event-1]-1, event-1, :, :] = signal_epoch.T
+                    signal_epoch = eegdata[eventpos[kk]:eventpos[kk]+num_samples, :]
+                    data[i, repeat[event-1]-1, event-1, :, :] = signal_epoch
 
     return data, target
 

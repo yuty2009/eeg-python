@@ -14,7 +14,10 @@ class Compose(object):
 
     def __call__(self, epoch, target=None):
         for t in self.transforms:
-            epoch, target = t(epoch, target)
+            if target is not None:
+                epoch, target = t(epoch, target)
+            else:
+                epoch = t(epoch, None)
         if target is not None:
             return epoch, target
         return epoch
@@ -72,7 +75,7 @@ class TemporalFiltering(nn.Module):
 class RandomTemporalShift(nn.Module):
     """Shift the EEG epoch along with the temporal dimention
     """
-    def __init__(self, ratio = 0.2):
+    def __init__(self, ratio = 0.25):
         super().__init__()
         self.ratio = ratio
 

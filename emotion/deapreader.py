@@ -8,14 +8,14 @@ from common.timefreq import *
 from scipy.stats import zscore
 
 
-def load_eegdata(filepath, chanset, stride, window):
+def load_eegdata(filepath, chanset, window, stride):
     f = open(filepath, 'rb')  # Read the file in Binary mode
     x = pickle.load(f, encoding='latin1')
     data, target = x['data'], x['labels']
-    return extract_eegdata(data, target, chanset, stride, window)
+    return extract_eegdata(data, target, chanset, window, stride)
 
 
-def extract_eegdata(data, target, chanset, stride, window):
+def extract_eegdata(data, target, chanset, window, stride):
     fs = 128
     num_samples = 60 * fs
     target[target<4.5] = 0
@@ -56,12 +56,11 @@ def load_dataset(datapath):
 if __name__ == '__main__':
 
     datapath = 'e:/eegdata/emotion/deap/data_preprocessed_python/'
-    # datapath = '/home/yuty2009/data/eegdata/emotion/deap/data_preprocessed_python/'
 
     fs = 128
     eegchan = np.arange(32)
-    stride = int(1.0 * fs)
     window = int(2.0 * fs)
+    stride = int(1.0 * fs)
     fbands = [4, 8, 13, 30, 47] # theta, alpha, beta, gamma
 
     import os
@@ -72,7 +71,7 @@ if __name__ == '__main__':
     data_all = []
     for filepath in glob.glob(datapath + "/*.dat"):
         print('Load and extract feature for %s' % filepath)
-        data, target = load_eegdata(filepath, eegchan, stride, window)
+        data, target = load_eegdata(filepath, eegchan, window, stride)
         features, labels = extract_feature_bandpower(data, target, fbands)
         data_i = dict()
         data_i['features'] = features

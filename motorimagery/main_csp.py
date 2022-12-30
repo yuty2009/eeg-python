@@ -21,7 +21,8 @@ chanset = np.arange(118)
 #     ]
 # chanset = np.hstack(chanset)
 n_channels = len(chanset)
-datapath = 'E:/bcicompetition/bci2005/IVa/'
+# datapath = 'E:/bcicompetition/bci2005/IVa/'
+datapath = '/Users/yuty2009/data/bcicompetition/bci2005/IVa/'
 subjects = ['aa', 'al', 'av', 'aw', 'ay']
 
 """
