@@ -23,18 +23,7 @@ n_classes = 3
 chanset = np.arange(62)
 n_channels = len(chanset)
 datapath = 'E:/eegdata/emotion/seed/preprocessed_eeg/'
-subjects = [
-    'dujingcheng', 'jianglin', 'jingjing', 'liuqiujun', 'liuye', 'mahaiwei', 'penghuiling',
-    'sunxiangyu', 'wangkui', 'weiwei', 'wusifan', 'wuyangwei', 'xiayulu', 'yansheng', 'zhujiayi'
-]
-
-
-order, f1, f2, ftrans = 4, 2.1, 38, 2
-fpass = [f1*2.0/fs, f2*2.0/fs]
-fstop =  [(f1-ftrans)*2.0/fs, (f2+ftrans)*2.0/fs]
-# fb, fa = signal.butter(order, fpass, btype='bandpass')
-fb, fa = signal.cheby2(order, 30, fstop, btype='bandpass')
-# show_filter(fb, fa, fs)
+subjects = seedreader.get_subject_list(datapath)
 
 window = 5 * fs
 timewin = [0, 5]
@@ -65,22 +54,25 @@ test_accus = np.zeros((len(subjects), n_folds))
 for ss in range(len(subjects)):
     subject = subjects[ss]
     print('Load EEG epochs for subject ' + subject)
-    dataSub, labelSub = seedreader.get_subject_data(datapath, subject, chanset, window, window)
-    print('Extract raw eeg for subject ' + subject)
-    fullset = seedreader.EEGDataset(dataSub, labelSub, tf_eeg)
+    data_sub, labels_sub = seedreader.get_subject_data(datapath, subject, chanset, window, window)
+    for sess in range(3):
+        data_sub[sess] = np.concatenate(data_sub[sess])
+        labels_sub[sess] = np.concatenate(labels_sub[sess])
+    data_sub = np.concatenate(data_sub)
+    labels_sub = np.concatenate(labels_sub)
+    fullset = seedreader.EEGDataset(data_sub, labels_sub, tf_eeg)
     fullset_size = len(fullset)
     splits = KFold(n_splits=n_folds, shuffle=True, random_state=42)
     for fold, (train_idx, test_idx) in enumerate(splits.split(np.arange(fullset_size))):
         print('Fold {}'.format(fold + 1))
+        trainfullset = Subset(fullset, train_idx)
+        testset = Subset(fullset, test_idx)
+
         valid_fraction = 0.2
         trainset_size = len(train_idx)
         train_valid_size = int(valid_fraction * trainset_size)
         train_train_size = trainset_size - train_valid_size
-        train_train_idx = train_idx[:train_train_size]
-        train_valid_idx = train_idx[train_train_size:]
-        trainset = Subset(fullset, train_train_idx)
-        validset = Subset(fullset, train_valid_idx)
-        testset = Subset(fullset, test_idx)
+        trainset, validset = random_split(trainfullset, [train_train_size, train_valid_size])
 
         model = CSPNet(n_timepoints, n_channels, n_classes).to(device)
         criterion = torch.nn.NLLLoss()
@@ -125,7 +117,7 @@ for ss in range(len(subjects)):
                         print('Early stop reached now continuing with full trainset')
                         epoch = 0
                         epochs_df.drop(epochs_df.index, inplace=True)
-                        trainset = fullset # Use the full train dataset
+                        trainset = trainfullset # Use the full train dataset
                         remember_best = RememberBest('valid_loss', order=1)
                         stop_criterion = Or( # for full trainset training
                             [
