@@ -9,6 +9,7 @@ from common.linear import *
 
 datapath = 'e:/eegdata/emotion/deap/data_preprocessed_python/'
 modelpath = os.path.join(datapath, 'models/')
+outpath = os.path.join(datapath, 'output/')
 data = reader.load_dataset(datapath)
 
 num_subjects = len(data)
@@ -32,5 +33,5 @@ for sub, data_sub in enumerate(data):
             accs[sub, task, fold] = np.mean(np.equal(labels_predict, labels_test).astype(np.float32))
             print("Subject %d, Task %d, Fold %d, Accuracy %.4f" % (sub, task, fold, accs[sub, task, fold]))
         print("Subject %d, Task %d, Mean accuracy %.4f" % (sub, task, np.mean(accs[sub, task])))
-np.savetxt("results/cv_single_subject.csv", np.mean(accs, axis=2), delimiter=',')
+np.savetxt(outpath + "cv_single_subject.csv", np.mean(accs, axis=2), delimiter=',')
 print(np.mean(np.mean(accs, axis=2)))

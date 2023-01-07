@@ -136,6 +136,13 @@ for ss in range(len(subjects)):
 
         test_accus[ss, fold] = test_accu
 
+subjects.append('average')
+test_accus = np.append(test_accus, np.mean(test_accus, axis=0))
+df_results = pd.DataFrame({'subject': subjects, 'accuracy': test_accus})
+df_results.to_csv(
+    os.path.join(outpath, 'results_' + model._get_name() 
+    + '_' + time.strftime('%Y%m%d%H%M%S.csv'))
+)
 print(f'Overall accuracy: {np.mean(test_accus): .3f}')
 
 test_accus_sub = np.mean(test_accus, 1)

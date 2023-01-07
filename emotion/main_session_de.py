@@ -2,6 +2,7 @@
 
 import os
 import numpy as np
+import pandas as pd
 from common.linear import *
 import seedreader
 
@@ -42,6 +43,13 @@ for ss in range(len(sessions)):
     test_accus[ss] = np.mean(np.equal(labels_predict, labels_test).astype(np.float32))
     print("Session %s, Accuracy %.4f" % (session, test_accus[ss]))
 
+sessions.append('average')
+test_accus = np.append(test_accus, np.mean(test_accus))
+df_results = pd.DataFrame({'session': sessions, 'accuracy': test_accus})
+df_results.to_csv(
+    os.path.join(outpath, 'results_' + model._get_name() 
+    + '_' + time.strftime('%Y%m%d%H%M%S.csv'))
+)
 print(f'Overall accuracy: {np.mean(test_accus): .3f}')
 
 import matplotlib.pyplot as plt

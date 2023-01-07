@@ -23,7 +23,7 @@ fs = 200
 n_classes = 3
 chanset = np.arange(62)
 n_channels = len(chanset)
-datapath = 'E:/eegdata/emotion/seed/preprocessed_eeg/'
+datapath = 'E:/eegdata/emotion/seed/Preprocessed_EEG/'
 sessions = seedreader.get_session_list(datapath)
 
 window = 5 * fs
@@ -136,6 +136,13 @@ for ss in range(len(sessions)):
 
     test_accus[ss] = test_accu
 
+sessions.append('average')
+test_accus = np.append(test_accus, np.mean(test_accus))
+df_results = pd.DataFrame({'session': sessions, 'accuracy': test_accus})
+df_results.to_csv(
+    os.path.join(outpath, 'results_' + model._get_name() 
+    + '_' + time.strftime('%Y%m%d%H%M%S.csv'))
+)
 print(f'Overall accuracy: {np.mean(test_accus): .3f}')
 
 import matplotlib.pyplot as plt
