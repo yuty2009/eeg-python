@@ -3,11 +3,11 @@
 import numpy as np
 from torch.utils.data import random_split
 from common.utils import *
-from common.torchutils import train_epoch, evaluate, DEVICE
+from common.torchutils import train_epoch, evaluate
 from sleepreader import *
 from sleepnet import DeepSleepNet, TinySleepNet
 
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 datapath = 'e:/eegdata/sleep/sleep-edf-database-expanded-1.0.0/sleep-cassette/'
 # datapath = '/Users/yuty2009/data/eegdata/sleep/sleep-edf-database-expanded-1.0.0/sleep-cassette/'
 data, labels, subjects = load_dataset_preprocessed(datapath+'processed/', n_subjects=39)
@@ -35,8 +35,8 @@ validset = [SeqEEGDataset(data[i], labels[i], n_seqlen, tf_epoch) for i in idx_v
 testset = [SeqEEGDataset(data[i], labels[i], n_seqlen, tf_epoch) for i in idx_test]
 print('%d train vs %d valid vs %d test' % (len(trainset), len(validset), len(testset)))
 
-model = TinySleepNet(n_timepoints, n_seqlen, n_classes).to(DEVICE)
-loss_fn = torch.nn.NLLLoss()
+model = TinySleepNet(n_timepoints, n_seqlen, n_classes).to(device)
+criterion = torch.nn.NLLLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-3)
 print(model)
 
@@ -52,8 +52,8 @@ for epoch in range(n_epochs):
     start = time.time()
     for sub in range(n_train):
         train_accu_sub, train_loss_sub = train_epoch(
-            model, trainset[sub], loss_fn=loss_fn, optimizer=optimizer,
-            batch_size=batch_size, device=DEVICE)
+            model, trainset[sub], criterion=criterion, optimizer=optimizer,
+            batch_size=batch_size, device=device)
         print(f"Epoch: {epoch}, Subject {subjects[idx_train[sub]]}, {sub+1}/{n_train}, "
               f"Train accu: {train_accu_sub:.3f}, loss: {train_loss_sub:.3f}")
         train_accu[epoch, sub] = train_accu_sub
@@ -61,8 +61,8 @@ for epoch in range(n_epochs):
        
     for sub in range(n_valid):
         valid_accu_sub, valid_loss_sub = evaluate(
-            model, validset[sub], loss_fn=loss_fn, 
-            batch_size=batch_size, device=DEVICE)
+            model, validset[sub], criterion=criterion, 
+            batch_size=batch_size, device=device)
         print(f"Epoch: {epoch}, Subject {subjects[idx_valid[sub]]}, {sub+1}/{n_valid}, "
               f"Valid accu: {valid_accu_sub:.3f}, loss: {valid_loss_sub:.3f}")
         valid_accu[epoch, sub] = valid_accu_sub
@@ -70,8 +70,8 @@ for epoch in range(n_epochs):
 
     for sub in range(n_test):
         test_accu_sub, test_loss_sub = evaluate(
-            model, testset[sub], loss_fn=loss_fn, 
-            batch_size=batch_size, device=DEVICE)
+            model, testset[sub], criterion=criterion, 
+            batch_size=batch_size, device=device)
         print(f"Epoch: {epoch}, Subject {subjects[idx_test[sub]]}, {sub+1}/{n_test}, "
               f"Test accu: {test_accu_sub:.3f}, loss: {test_loss_sub:.3f}")
         test_accu[epoch, sub] = test_accu_sub

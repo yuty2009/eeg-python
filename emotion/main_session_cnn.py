@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import random_split
 from torch.utils.data.dataset import Subset
+import sys; sys.path.append(os.path.dirname(__file__)+"/../")
 from common.transforms import *
 from common.torchutils import RememberBest
 from common.stopcriteria import Or, MaxEpochs, NoIncrease, ColumnBelow
@@ -74,7 +75,7 @@ for ss in range(len(sessions)):
     labels_test = np.concatenate(labels_test)
     testset = seedreader.EEGDataset(data_test, labels_test, tf_eeg)
 
-    model = ACRNN(n_timepoints, n_channels, n_classes).to(device)
+    model = EEGTransformer(n_timepoints, n_channels, n_classes).to(device)
     criterion = torch.nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters())
 

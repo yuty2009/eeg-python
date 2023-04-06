@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import random_split
 from torch.utils.data.dataset import Subset
+import sys; sys.path.append(os.path.dirname(__file__)+"/../")
 from common.transforms import *
 from common.torchutils import RememberBest
 from common.stopcriteria import Or, MaxEpochs, NoIncrease, ColumnBelow
